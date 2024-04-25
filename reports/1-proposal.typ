@@ -40,53 +40,58 @@
 
 = Background
 
-Go is a high-level, compiled memory-safe programming language created by Google
+Go is a high-level, compiled, memory-safe programming language created by Google
 in 2007 and made public two years later. Nowadays, it has seen widespread
-adoption in various applications, such as backend web development, CLI
-applications and services and more, due to its C-like performance and good
-developer experience.
+adoption in various fields, for the most part due to its C-like performance and
+improved developer experience.
 
-= Project Goals
+= Project Goals <goals>
 
-However, the Go language lacks any kind of information flow control mechanisms.
-This project's goal is to implement these mechanisms for the Go language through
-a standalone application that can be ran over Go source code at compile time,
-reporting any violations of the information flow policies (?).
+Although Go is designed to avoid certain kinds of bugs (e.g., it does not
+support pointer arithmetic), it lacks any mechanisms to enforce information flow
+security through non-interference. This project's objective is to conceptualize
+and implement a conservative *static analyzer* for (a subset of) the Go
+language, allowing insecure data interference flows (both implicit and explicit)
+to be detected and reported at compile time. Additionally, the tool should
+prioritize ease of use and incur zero runtime costs.
 
 = Relevance to Language-Based Security
 
-The proposed static information flow control analyser works at the language
+The proposed static information flow control analyzer works at the language
 level, even before Go's compiler is able to produce any executables, preventing
-a whole class of bugs and unintended data flows.
+an entire class of bugs and unintended data flows. It is therefore an extension
+to the Go environment with the goal of attaining improved security.
 
 = Planned Work Overview
 
-To achieve the goal of this project, a Rust program will be created that is able
-to parse Go code and then analyse it the information flow of certain variables.
-Due to time constrains, only a subset of the Go language will be supported. For
-the same reason, the initial version of this program will only allow low and
-high variables, but multiple labels support will be accounted for during
-development.
+In order to achieve the goals described in @goals, we propose developing a
+standalone Rust command-line application capable of parsing Go code and
+analyzing both explicit and implicit data flows. Due to time constraints, the
+initial prototype would only support a subset of the Go language, and only allow
+tracking two security labels (#smallcaps[High] and #smallcaps[Low]), but in any
+case special care would be taken during development to facilitate these later
+extensions by promoting modularity and loose coupling.
 
-= Schedule
+= Preliminary Schedule
 
-- *Week 18 (29#super[th] April - 5#super[th] May):* Initial implementation of Go
-  parser and AST nodes for variable declaration and conditional statements;
-- *Week 19 (6#super[th] - 12#super[th] May):* Initial implementation of IFC
-  analyser for supported AST nodes;
-- *Week 20 (13#super[th] - 19#super[th] May):* Expansion of parser to more nodes,
-  such as loops, function calls, etc.;
-- *Week 21 (20#super[th] - 26#super[th] May):* Expansion of IFC analyser to
-  support the AST nodes added in the previous week;
-- *Week 22 (27#super[th] May - 2#super[nd] June):* Elaboration of draft project
-  report and final cleanup;
-- *3#super[rd] June:* Project presentation.
+- *Week 18 (29#super[th] April - 5#super[th] May):* initial implementation of Go
+  parser and AST nodes for variable declaration, assignment, and conditional
+  statements;
+- *Week 19 (6#super[th] - 12#super[th] May):* initial implementation of the IFC
+  analyzer for the aforementioned nodes;
+- *Week 20 (13#super[th] - 19#super[th] May):* parser expansion to support more Go
+  features, e.g. loops, function calls;
+- *Week 21 (20#super[th] - 26#super[th] May):* IFC analyzer expansion to support
+  said newly-parsable Go features;
+- *Week 22 (27#super[th] May - 2#super[nd] June):* formalization into draft
+  project report plus final cleanup; and
+- *3#super[rd] June:* project presentation.
 
 = Conclusion
 
 In summary, this project aims to produce a working proof-of-concept for a static
-information flow analyser for the Go language, since such program seems to not
-exist to the best of our knowledge. With this project, we aim to achieve the
-grade A, due to the high implementation complexity it entails and the relevance
-of the topic for the course.
+information flow analyzer for the Go language, since such a program does not
+seem to exist at the moment within the ecosystem. With this project, we aim to
+achieve the grade A, due to the high conceptualization and implementation
+complexity it entails and the relevance of the topic for the course.
 
