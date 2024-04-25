@@ -1,6 +1,16 @@
 [package]
 name = "glowy"
 description = "Information flow control analysis for Go"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[workspace]
+members = [".", "parser"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["Rafael Oliveira", "Diogo Correia"]
@@ -8,3 +18,4 @@ repository = "https://github.com/ist199211-ist199311/glowy-langsec"
 license = "MIT"
 
 [dependencies]
+parser = { path = "parser" }
