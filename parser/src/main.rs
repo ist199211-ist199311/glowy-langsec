@@ -1,4 +1,4 @@
-use std::io;
+use std::{env, fs, io};
 
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label},
@@ -11,19 +11,25 @@ use codespan_reporting::{
 use parser::{parse, Span};
 
 fn main() {
-    let input = io::read_to_string(io::stdin()).expect("Failed to read input from stdin");
+    let path = env::args().nth(1);
+
+    let input = if let Some(path) = &path {
+        fs::read_to_string(path).expect("Failed to read file at specified path")
+    } else {
+        io::read_to_string(io::stdin()).expect("Failed to read input from stdin")
+    };
 
     match parse(&input) {
         Ok(root) => println!("{root:#?}"),
-        Err(Some(ctx)) => show_error(&input, &ctx),
+        Err(Some(ctx)) => show_error(&path, &input, &ctx),
         Err(None) => eprintln!("ERROR: Something went wrong while parsing!"),
     }
 }
 
-fn show_error(input: &str, ctx: &Span) {
+fn show_error(path: &Option<String>, input: &str, ctx: &Span) {
     // TODO: show more detailed/useful error messages
 
-    let file = SimpleFile::new("<stdin>", input);
+    let file = SimpleFile::new(path.as_deref().unwrap_or("<stdin>"), input);
 
     let diagnostic = Diagnostic::error()
         .with_code("E042")
