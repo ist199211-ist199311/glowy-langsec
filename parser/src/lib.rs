@@ -1,4 +1,4 @@
-use ast::{Node, NodeKind};
+use ast::{PackageClauseNode, SourceFileNode};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -15,7 +15,7 @@ pub mod ast;
 
 type Span<'a> = LocatedSpan<&'a str>;
 type SResult<'a> = IResult<Span<'a>, Span<'a>>;
-type NResult<'a> = IResult<Span<'a>, Node<'a>>;
+type NResult<'a, T> = IResult<Span<'a>, T>;
 
 fn sp01<'a, T: 'a, F, O, E>(inner: F) -> impl Parser<T, O, E>
 where
@@ -58,17 +58,19 @@ fn eol(s: Span) -> SResult {
     ))(s)
 }
 
-fn package(s: Span) -> NResult {
+fn package(s: Span) -> NResult<PackageClauseNode> {
     let (s, id) = delimited(sp01(tag("package")), identifier, eol)(s)?;
 
-    Ok((s, Node::new(NodeKind::PackageClause { id })))
+    Ok((s, PackageClauseNode { id }))
 }
 
-fn source_file(s: Span) -> NResult {
-    msp(package).parse(s)
+fn source_file(s: Span) -> NResult<SourceFileNode> {
+    let (s, package_clause) = msp(package).parse(s)?;
+
+    Ok((s, SourceFileNode { package_clause }))
 }
 
-pub fn parse(input: &str) -> Result<Node, Option<Span>> {
+pub fn parse(input: &str) -> Result<SourceFileNode, Option<Span>> {
     match source_file(Span::new(input)) {
         Ok((_, node)) => Ok(node),
         Err(nom::Err::Error(inner)) => Err(Some(inner.input)),
@@ -87,9 +89,11 @@ mod tests {
     #[test]
     fn package_no_semi_colon() {
         assert_eq!(
-            Ok(Node::new(NodeKind::PackageClause {
-                id: span("ab12_3F", 17, 3)
-            })),
+            Ok(SourceFileNode {
+                package_clause: PackageClauseNode {
+                    id: span("ab12_3F", 17, 3)
+                },
+            }),
             parse("\n\n    \tpackage   ab12_3F\t\n\t")
         );
     }
@@ -97,9 +101,11 @@ mod tests {
     #[test]
     fn package_semi_colon() {
         assert_eq!(
-            Ok(Node::new(NodeKind::PackageClause {
-                id: span("ABC", 8, 1)
-            })),
+            Ok(SourceFileNode {
+                package_clause: PackageClauseNode {
+                    id: span("ABC", 8, 1)
+                },
+            }),
             parse("package ABC\t  ;\n")
         );
     }
