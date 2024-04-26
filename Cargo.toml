@@ -17,5 +17,8 @@ authors = ["Rafael Oliveira", "Diogo Correia"]
 repository = "https://github.com/ist199211-ist199311/glowy-langsec"
 license = "MIT"
 
+[workspace.dependencies]
+codespan-reporting = "0.11.1"
+
 [dependencies]
 parser = { path = "parser" }

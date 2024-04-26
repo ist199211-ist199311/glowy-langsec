@@ -14,7 +14,7 @@ use nom_locate::LocatedSpan;
 pub mod ast;
 mod consts;
 
-type Span<'a> = LocatedSpan<&'a str>;
+pub type Span<'a> = LocatedSpan<&'a str>;
 type SResult<'a> = IResult<Span<'a>, Span<'a>>;
 type NResult<'a, T> = IResult<Span<'a>, T>;
 
