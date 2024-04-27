@@ -13,6 +13,7 @@ use nom_locate::LocatedSpan;
 
 pub mod ast;
 mod consts;
+mod exprs;
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 type SResult<'a> = IResult<Span<'a>, Span<'a>>;
@@ -44,6 +45,7 @@ fn unicode_digit(s: Span) -> SResult {
 }
 
 fn letter(s: Span) -> SResult {
+    // FIXME: support non-ASCII
     alt((alpha1, tag("_")))(s)
 }
 

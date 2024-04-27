@@ -23,3 +23,21 @@ pub struct ConstDeclSpecNode<'a> {
     // TODO: pub r#type: Option<___>
     // TODO: pub exprs: Vec<ExprNode>
 }
+
+#[derive(Debug, PartialEq)]
+pub enum ExprNode<'a> {
+    Name(OperandNameNode<'a>),
+    // TODO: more primary expressions...
+}
+
+impl<'a> From<OperandNameNode<'a>> for ExprNode<'a> {
+    fn from(node: OperandNameNode<'a>) -> Self {
+        Self::Name(node)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct OperandNameNode<'a> {
+    pub package: Option<Span<'a>>, // for qualified operand names
+    pub id: Span<'a>,
+}
