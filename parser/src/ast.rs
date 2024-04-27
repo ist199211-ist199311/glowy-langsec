@@ -27,6 +27,7 @@ pub struct ConstDeclSpecNode<'a> {
 #[derive(Debug, PartialEq)]
 pub enum ExprNode<'a> {
     Name(OperandNameNode<'a>),
+    Literal(LiteralNode),
     // TODO: more primary expressions...
 }
 
@@ -36,8 +37,23 @@ impl<'a> From<OperandNameNode<'a>> for ExprNode<'a> {
     }
 }
 
+impl From<LiteralNode> for ExprNode<'_> {
+    fn from(node: LiteralNode) -> Self {
+        Self::Literal(node)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct OperandNameNode<'a> {
     pub package: Option<Span<'a>>, // for qualified operand names
     pub id: Span<'a>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LiteralNode {
+    Int(u64),
+    Float(f64),
+    Imaginary(f64),
+    Rune(i32),
+    String(String),
 }
