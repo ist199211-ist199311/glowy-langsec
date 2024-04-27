@@ -19,9 +19,25 @@ pub enum TopLevelDeclNode<'a> {
 
 #[derive(Debug, PartialEq)]
 pub struct ConstDeclSpecNode<'a> {
-    pub ids: Vec<Span<'a>>,
+    pub mapping: Vec<(Span<'a>, ExprNode<'a>)>,
     // TODO: pub r#type: Option<___>
-    // TODO: pub exprs: Vec<ExprNode>
+}
+
+pub struct MismatchingConstDeclSpecListsLength;
+
+impl<'a> ConstDeclSpecNode<'a> {
+    pub fn try_new(
+        ids: Vec<Span<'a>>,
+        exprs: Vec<ExprNode<'a>>,
+    ) -> Result<Self, MismatchingConstDeclSpecListsLength> {
+        if ids.len() != exprs.len() {
+            Err(MismatchingConstDeclSpecListsLength {})
+        } else {
+            Ok(Self {
+                mapping: ids.into_iter().zip(exprs).collect(),
+            })
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]

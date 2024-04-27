@@ -99,7 +99,7 @@ mod tests {
     use std::fmt::Debug;
 
     use super::*;
-    use crate::ast::ConstDeclSpecNode;
+    use crate::ast::{ConstDeclSpecNode, ExprNode, LiteralNode};
 
     pub fn span(fragment: &str, offset: usize, line: u32) -> Span {
         unsafe { Span::new_from_raw_offset(offset, line, fragment, ()) }
@@ -155,14 +155,23 @@ mod tests {
                 },
                 top_level_decls: vec![
                     TopLevelDeclNode::Const(vec![ConstDeclSpecNode {
-                        ids: vec![span("abc3", 20, 3)]
+                        mapping: vec![(
+                            span("abc3", 20, 3),
+                            ExprNode::Literal(LiteralNode::Int(42))
+                        )]
                     }]),
                     TopLevelDeclNode::Const(vec![
                         ConstDeclSpecNode {
-                            ids: vec![span("a", 38, 5),]
+                            mapping: vec![(
+                                span("a", 38, 5),
+                                ExprNode::Literal(LiteralNode::Int(7))
+                            )]
                         },
                         ConstDeclSpecNode {
-                            ids: vec![span("b", 46, 6), span("c", 50, 7)]
+                            mapping: vec![
+                                (span("b", 46, 6), ExprNode::Literal(LiteralNode::Int(8))),
+                                (span("c", 50, 7), ExprNode::Literal(LiteralNode::Int(9)))
+                            ]
                         }
                     ])
                 ]
