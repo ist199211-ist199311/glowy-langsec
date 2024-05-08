@@ -19,9 +19,9 @@ pub type Span<'a> = LocatedSpan<&'a str>;
 type SResult<'a> = IResult<Span<'a>, Span<'a>>;
 type NResult<'a, T> = IResult<Span<'a>, T>;
 
-fn msp00<'a, T: 'a, F, O, E>(inner: F) -> impl Parser<T, O, E>
+fn msp00<'a, T, F, O, E>(inner: F) -> impl Parser<T, O, E>
 where
-    T: InputTakeAtPosition,
+    T: 'a + InputTakeAtPosition,
     <T as InputTakeAtPosition>::Item: AsChar + Clone,
     F: Parser<T, O, E>,
     E: ParseError<T>,
@@ -29,15 +29,18 @@ where
     delimited(multispace0, inner, multispace0)
 }
 
-fn msp01<'a, T: 'a, F, O, E>(inner: F) -> impl Parser<T, O, E>
+fn msp01<'a, T, F, O, E>(inner: F) -> impl Parser<T, O, E>
 where
-    T: InputTakeAtPosition,
+    T: 'a + InputTakeAtPosition,
     <T as InputTakeAtPosition>::Item: AsChar + Clone,
     F: Parser<T, O, E>,
     E: ParseError<T>,
 {
     delimited(multispace0, inner, multispace1)
 }
+
+// ! CONVENTION: most if not all parsers expect whitespace to have
+// ! already been trimmed around the input that they're passed
 
 fn unicode_digit(s: Span) -> SResult {
     // FIXME: support non-ASCII

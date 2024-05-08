@@ -21,6 +21,8 @@ fn decimal_int_lit(s: Span) -> NResult<LiteralNode> {
     }
 }
 
+// nom has float parser!
+
 fn int_literal(s: Span) -> NResult<LiteralNode> {
     alt((decimal_int_lit,))(s)
 }
