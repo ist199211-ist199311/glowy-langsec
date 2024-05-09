@@ -20,7 +20,7 @@ impl<'a> Diagnostics<'a> for LexingError<'a> {
                 code: "L001".to_owned(),
                 overview: "failed to process unknown character".to_owned(),
                 details: "this character is invalid in Go or unsupported".to_owned(),
-                context: context.clone(),
+                context: Some(context.clone()),
             },
         }
     }

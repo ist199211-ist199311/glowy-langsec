@@ -4,7 +4,7 @@ use ast::SourceFileNode;
 pub use errors::{Diagnostics, ErrorDiagnosticInfo, ParsingError};
 use lexer::Lexer;
 
-use crate::parser::build_ast_from_tokens;
+use crate::parser::parse_source_file;
 
 pub mod ast;
 mod errors;
@@ -29,14 +29,14 @@ impl<'a> Span<'a> {
     }
 
     pub fn location(&self) -> Range<usize> {
-        self.offset..(self.content.len() + 1)
+        self.offset..(self.offset + self.content.len())
     }
 }
 
 type TokenStream<'a> = Peekable<Lexer<'a>>;
 
-pub fn parse(input: &str) -> Result<SourceFileNode<'_>, ParsingError<'_>> {
-    let stream = Lexer::new(input).peekable();
+pub fn parse(input: &str) -> Result<SourceFileNode, ParsingError> {
+    let mut stream = Lexer::new(input).peekable();
 
-    build_ast_from_tokens(stream)
+    parse_source_file(&mut stream)
 }

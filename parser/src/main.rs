@@ -28,12 +28,18 @@ fn main() {
 fn show_error(path: &Option<String>, input: &str, info: ErrorDiagnosticInfo) {
     let file = SimpleFile::new(path.as_deref().unwrap_or("<stdin>"), input);
 
+    let location = if let Some(ctx) = info.context {
+        ctx.location()
+    } else {
+        // default to last char to represent eof;
+        // note that this might return an empty range if input is empty
+        input.len().saturating_sub(1)..input.len()
+    };
+
     let diagnostic = Diagnostic::error()
         .with_code(info.code)
         .with_message(info.overview)
-        .with_labels(vec![
-            Label::primary((), info.context.location()).with_message(info.details)
-        ])
+        .with_labels(vec![Label::primary((), location).with_message(info.details)])
         .with_notes(vec![concat!(
             "help: if you're sure your Go syntax is correct, ",
             "this parser may not support that construct"
