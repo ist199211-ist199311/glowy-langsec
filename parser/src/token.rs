@@ -5,6 +5,7 @@ pub enum TokenKind {
     SemiColon, // ;
 
     Comma,  // ,
+    Period, // .
     Assign, // =
 
     ParenL, // (

@@ -43,6 +43,18 @@ impl<'a> ConstDeclSpecNode<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum ExprNode<'a> {
-    // TODO: implement actual expressions
-    Placeholder(Span<'a>),
+    Name(OperandNameNode<'a>),
+    // TODO: more expressions...
+}
+
+impl<'a> From<OperandNameNode<'a>> for ExprNode<'a> {
+    fn from(node: OperandNameNode<'a>) -> Self {
+        Self::Name(node)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct OperandNameNode<'a> {
+    pub package: Option<Span<'a>>, // for qualified operand names
+    pub id: Span<'a>,
 }

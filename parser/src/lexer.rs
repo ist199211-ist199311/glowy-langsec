@@ -111,6 +111,7 @@ impl<'a> Iterator for Lexer<'a> {
             Some(';') => single_char_token!(TokenKind::SemiColon),
 
             Some(',') => single_char_token!(TokenKind::Comma),
+            Some('.') => single_char_token!(TokenKind::Period),
             Some('=') => single_char_token!(TokenKind::Assign),
 
             Some('(') => single_char_token!(TokenKind::ParenL),
