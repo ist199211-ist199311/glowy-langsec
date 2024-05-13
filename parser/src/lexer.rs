@@ -4,11 +4,11 @@ use finl_unicode::categories::CharacterCategories;
 
 use crate::{
     errors::{Diagnostics, ErrorDiagnosticInfo},
-    token::Token,
+    token::{Token, TokenKind},
     Span,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum LexingError<'a> {
     UnknownChar(Span<'a>),
 }
@@ -101,7 +101,21 @@ impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token<'a>, LexingError<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        macro_rules! single_char_token {
+            ($kind:expr) => {
+                Token::new($kind, self.read_span().unwrap())
+            };
+        }
+
         let token = match self.peek_char() {
+            Some(';') => single_char_token!(TokenKind::SemiColon),
+
+            Some(',') => single_char_token!(TokenKind::Comma),
+            Some('=') => single_char_token!(TokenKind::Assign),
+
+            Some('(') => single_char_token!(TokenKind::ParenL),
+            Some(')') => single_char_token!(TokenKind::ParenR),
+
             Some(ch) if is_letter(ch) => self.identifier_or_keyword(),
             Some(ch) if is_whitespace(ch) => {
                 self.read_char(); // advance iterator

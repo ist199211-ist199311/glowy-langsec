@@ -2,11 +2,18 @@ use crate::Span;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenKind {
-    SemiColon(bool), // true if real (i.e., not auto-inserted)
+    SemiColon, // ;
+
+    Comma,  // ,
+    Assign, // =
+
+    ParenL, // (
+    ParenR, // )
 
     Ident,
 
     // keywords
+    Const,
     Package,
 }
 
@@ -17,8 +24,13 @@ pub struct Token<'a> {
 }
 
 impl<'a> Token<'a> {
+    pub fn new(kind: TokenKind, span: Span<'a>) -> Self {
+        Self { kind, span }
+    }
+
     pub fn from_identifier_or_keyword(span: Span<'a>) -> Self {
         let kind = match span.content {
+            "const" => TokenKind::Const,
             "package" => TokenKind::Package,
             _ => TokenKind::Ident,
         };

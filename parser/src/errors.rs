@@ -4,15 +4,18 @@ use crate::{
     Span,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ParsingError<'a> {
     Lexing(LexingError<'a>),
-    UnexpectedToken {
+    UnexpectedTokenKind {
         expected: TokenKind,
         found: Option<Token<'a>>,      // None means EOF
         context: Option<&'static str>, // for error message
     },
-    ExtraneousToken(Token<'a>),
+    UnexpectedConstruct {
+        expected: &'static str,
+        found: Option<Token<'a>>, // None means EOF
+    },
 }
 
 impl<'a> From<LexingError<'a>> for ParsingError<'a> {
@@ -42,7 +45,7 @@ impl<'a> Diagnostics<'a> for ParsingError<'a> {
 
         match self {
             Self::Lexing(e) => e.diagnostics(),
-            Self::UnexpectedToken {
+            Self::UnexpectedTokenKind {
                 expected,
                 found,
                 context,
@@ -63,14 +66,18 @@ impl<'a> Diagnostics<'a> for ParsingError<'a> {
                 ),
                 context: found.clone().map(|t| t.span),
             },
-            Self::ExtraneousToken(found) => ErrorDiagnosticInfo {
-                code: s!("P003"),
-                overview: s!("extraneous token"),
+            Self::UnexpectedConstruct { expected, found } => ErrorDiagnosticInfo {
+                code: s!("P002"),
+                overview: s!("unexpected construct"),
                 details: format!(
-                    "expected end-of-file, but found a token of kind {:?}",
+                    "expected {}, but found {}",
+                    expected,
                     found
+                        .as_ref()
+                        .map(|t| format!("a token of kind {:?}", t.kind))
+                        .unwrap_or(s!("end-of-file"))
                 ),
-                context: Some(found.span.clone()),
+                context: found.clone().map(|t| t.span),
             },
         }
     }
