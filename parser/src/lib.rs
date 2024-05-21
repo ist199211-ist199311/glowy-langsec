@@ -29,6 +29,10 @@ impl<'a> Span<'a> {
         }
     }
 
+    pub fn content(&self) -> &'a str {
+        self.content
+    }
+
     pub fn location(&self) -> Range<usize> {
         self.offset..(self.offset + self.content.len())
     }
