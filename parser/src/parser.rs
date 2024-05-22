@@ -55,7 +55,9 @@ fn parse_package_clause<'a>(s: &mut TokenStream<'a>) -> PResult<'a, PackageClaus
     Ok(PackageClauseNode { id: ident.span })
 }
 
-fn parse_top_level_decl<'a>(s: &mut TokenStream<'a>) -> PResult<'a, Option<TopLevelDeclNode<'a>>> {
+fn try_parse_top_level_decl<'a>(
+    s: &mut TokenStream<'a>,
+) -> PResult<'a, Option<TopLevelDeclNode<'a>>> {
     match s.peek().cloned().transpose()? {
         None => Ok(None), // eof
         Some(of_kind!(TokenKind::Const)) => Ok(Some(parse_const_decl(s)?)),
@@ -73,7 +75,7 @@ pub fn parse_source_file<'a>(s: &mut TokenStream<'a>) -> PResult<'a, SourceFileN
 
     let mut top_level_decls = vec![];
 
-    while let Some(decl) = parse_top_level_decl(s)? {
+    while let Some(decl) = try_parse_top_level_decl(s)? {
         top_level_decls.push(decl);
         expect(s, TokenKind::SemiColon, None)?;
     }

@@ -11,6 +11,8 @@ pub enum TokenKind {
     ParenL, // (
     ParenR, // )
 
+    Int(u64), // 3
+
     Ident,
 
     // keywords

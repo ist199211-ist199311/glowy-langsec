@@ -1,6 +1,6 @@
 use super::{expect, PResult};
 use crate::{
-    ast::{ExprNode, OperandNameNode},
+    ast::{ExprNode, LiteralNode, OperandNameNode},
     parser::of_kind,
     token::{Token, TokenKind},
     ParsingError, TokenStream,
@@ -27,6 +27,10 @@ fn parse_operand_name<'a>(s: &mut TokenStream<'a>) -> PResult<'a, OperandNameNod
 pub fn parse_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
     match s.peek().cloned().transpose()? {
         Some(of_kind!(TokenKind::Ident)) => Ok(parse_operand_name(s)?.into()),
+        Some(of_kind!(TokenKind::Int(v))) => {
+            s.next(); // advance
+            Ok(LiteralNode::Int(v).into())
+        }
         found => Err(ParsingError::UnexpectedConstruct {
             expected: "an expression",
             found,
