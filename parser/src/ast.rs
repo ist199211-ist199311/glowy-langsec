@@ -46,11 +46,26 @@ pub enum ExprNode<'a> {
     Name(OperandNameNode<'a>),
     Literal(LiteralNode),
     // TODO: more primary expressions...
+    UnaryOp {
+        kind: UnaryOpKind,
+        operand: Box<ExprNode<'a>>,
+    },
     BinaryOp {
         kind: BinaryOpKind,
         left: Box<ExprNode<'a>>,
         right: Box<ExprNode<'a>>,
     },
+}
+
+#[derive(Debug, PartialEq)]
+pub enum UnaryOpKind {
+    Identity,   // +x is 0 + x
+    Negation,   // -x is 0 - x
+    Complement, // ^x is m ^ x for [m = 0b111..11 if x unsigned] or [m = -1 if x signed]
+    Not,        //_!x
+    Deref,      //_*x
+    Address,    // &x
+    Receive,    // <-x
 }
 
 #[derive(Debug, PartialEq)]
