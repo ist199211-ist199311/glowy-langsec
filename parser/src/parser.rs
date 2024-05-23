@@ -1,13 +1,13 @@
-use consts::parse_const_decl;
+use decls::try_parse_top_level_decl;
 
 use crate::{
-    ast::{PackageClauseNode, SourceFileNode, TopLevelDeclNode},
+    ast::{PackageClauseNode, SourceFileNode},
     errors::ParsingError,
     token::{Token, TokenKind},
     TokenStream,
 };
 
-mod consts;
+mod decls;
 mod exprs;
 
 type PResult<'a, T> = Result<T, ParsingError<'a>>;
@@ -53,19 +53,6 @@ fn parse_package_clause<'a>(s: &mut TokenStream<'a>) -> PResult<'a, PackageClaus
     let ident = expect(s, TokenKind::Ident, Some("package clause"))?;
 
     Ok(PackageClauseNode { id: ident.span })
-}
-
-fn try_parse_top_level_decl<'a>(
-    s: &mut TokenStream<'a>,
-) -> PResult<'a, Option<TopLevelDeclNode<'a>>> {
-    match s.peek().cloned().transpose()? {
-        None => Ok(None), // eof
-        Some(of_kind!(TokenKind::Const)) => Ok(Some(parse_const_decl(s)?)),
-        Some(token) => Err(ParsingError::UnexpectedConstruct {
-            expected: "a top-level declaration",
-            found: Some(token),
-        }),
-    }
 }
 
 pub fn parse_source_file<'a>(s: &mut TokenStream<'a>) -> PResult<'a, SourceFileNode<'a>> {

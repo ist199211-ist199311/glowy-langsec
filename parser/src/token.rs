@@ -59,6 +59,7 @@ pub enum TokenKind {
     // keywords
     Const,
     Package,
+    Var,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -76,6 +77,7 @@ impl<'a> Token<'a> {
         let kind = match span.content {
             "const" => TokenKind::Const,
             "package" => TokenKind::Package,
+            "var" => TokenKind::Var,
             _ => TokenKind::Ident,
         };
 

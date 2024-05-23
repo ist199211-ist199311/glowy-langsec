@@ -14,25 +14,27 @@ pub struct PackageClauseNode<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum TopLevelDeclNode<'a> {
-    Const(Vec<ConstDeclSpecNode<'a>>),
+    Const(Vec<BindingDeclSpecNode<'a>>),
+    Var(Vec<BindingDeclSpecNode<'a>>),
 }
 
+// binding = const or var, since specs look the same for both
 #[derive(Debug, PartialEq)]
-pub struct ConstDeclSpecNode<'a> {
+pub struct BindingDeclSpecNode<'a> {
     pub mapping: Vec<(Span<'a>, ExprNode<'a>)>,
     // TODO: pub r#type: Option<___>
 }
 
 #[derive(Debug)]
-pub struct MismatchingConstDeclSpecListsLength;
+pub struct MismatchingBindingDeclSpecListsLength;
 
-impl<'a> ConstDeclSpecNode<'a> {
+impl<'a> BindingDeclSpecNode<'a> {
     pub fn try_new(
         ids: Vec<Span<'a>>,
         exprs: Vec<ExprNode<'a>>,
-    ) -> Result<Self, MismatchingConstDeclSpecListsLength> {
+    ) -> Result<Self, MismatchingBindingDeclSpecListsLength> {
         if ids.len() != exprs.len() {
-            Err(MismatchingConstDeclSpecListsLength {})
+            Err(MismatchingBindingDeclSpecListsLength {})
         } else {
             Ok(Self {
                 mapping: ids.into_iter().zip(exprs).collect(),
