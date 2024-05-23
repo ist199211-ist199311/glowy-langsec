@@ -8,8 +8,10 @@ pub enum TokenKind {
     Period, // .
     Colon,  // :
 
-    ParenL, // (
-    ParenR, // )
+    ParenL,  // (
+    ParenR,  // )
+    SquareL, // [
+    SquareR, // ]
 
     Plus,    // +
     Minus,   // -

@@ -295,6 +295,8 @@ impl<'a> Iterator for Lexer<'a> {
 
             Some('(') => single_char_token!(TokenKind::ParenL),
             Some(')') => single_char_token!(TokenKind::ParenR),
+            Some('[') => single_char_token!(TokenKind::SquareL),
+            Some(']') => single_char_token!(TokenKind::SquareR),
 
             Some(':') => single_or_eq!(TokenKind::Colon, TokenKind::ColonAssign),
             Some('*') => single_or_eq!(TokenKind::Star, TokenKind::StarAssign),

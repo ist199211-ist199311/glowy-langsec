@@ -1,6 +1,6 @@
 use crate::{
     ast::{BindingDeclSpecNode, TopLevelDeclNode},
-    parser::{expect, exprs::parse_expression, of_kind, PResult},
+    parser::{expect, exprs::parse_expression, of_kind, types::parse_type, PResult},
     token::{Token, TokenKind},
     ParsingError, TokenStream,
 };
@@ -50,26 +50,43 @@ impl BindingKind {
     }
 }
 
-fn parse_spec<'a>(s: &mut TokenStream<'a>) -> PResult<'a, BindingDeclSpecNode<'a>> {
+fn parse_spec<'a>(
+    s: &mut TokenStream<'a>,
+    kind: &BindingKind,
+) -> PResult<'a, BindingDeclSpecNode<'a>> {
     let mut ids = vec![];
     let mut exprs = vec![];
+    let mut r#type = None;
 
     loop {
         let token = expect(s, TokenKind::Ident, Some("list of identifiers"))?;
         ids.push(token.span);
 
-        match s.next().transpose()? {
-            Some(of_kind!(TokenKind::Assign)) => break,
-            Some(of_kind!(TokenKind::Comma)) => {}
-            found => {
+        match s.peek().cloned().transpose()? {
+            Some(of_kind!(TokenKind::Comma)) => {
+                s.next(); // advance
+                continue;
+            }
+            Some(of_kind!(TokenKind::Assign)) => {
+                s.next(); // advance
+            }
+            Some(_) => {
+                r#type = Some(parse_type(s)?);
+                expect(s, TokenKind::Assign, Some(kind.spec_context()))?;
+            }
+            None => {
                 return Err(ParsingError::UnexpectedTokenKind {
                     expected: TokenKind::Comma,
-                    found,
+                    found: None,
                     context: Some("list of identifiers"),
                 })
             }
         };
+
+        break;
     }
+
+    // TODO: allow empty expression list for consts (if prev spec was non-empty)
 
     exprs.push(parse_expression(s)?);
     while exprs.len() < ids.len() {
@@ -77,7 +94,7 @@ fn parse_spec<'a>(s: &mut TokenStream<'a>) -> PResult<'a, BindingDeclSpecNode<'a
         exprs.push(parse_expression(s)?);
     }
 
-    Ok(BindingDeclSpecNode::try_new(ids, exprs).unwrap())
+    Ok(BindingDeclSpecNode::try_new(ids, exprs, r#type).unwrap())
 }
 
 fn parse_specs_list<'a>(
@@ -93,7 +110,7 @@ fn parse_specs_list<'a>(
         match s.peek().cloned().transpose()? {
             Some(of_kind!(TokenKind::ParenR)) => break,
             Some(of_kind!(TokenKind::Ident)) => {
-                specs.push(parse_spec(s)?);
+                specs.push(parse_spec(s, kind)?);
                 expect(s, TokenKind::SemiColon, Some(kind.spec_context()))?;
             }
             found => {
@@ -117,7 +134,7 @@ pub fn parse_binding_decl<'a>(
     expect(s, kind.keyword(), Some(kind.decl_context()))?;
 
     let specs = match s.peek().cloned().transpose()? {
-        Some(of_kind!(TokenKind::Ident)) => vec![parse_spec(s)?],
+        Some(of_kind!(TokenKind::Ident)) => vec![parse_spec(s, &kind)?],
         Some(of_kind!(TokenKind::ParenL)) => parse_specs_list(s, &kind)?,
         found => {
             return Err(ParsingError::UnexpectedConstruct {

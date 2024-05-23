@@ -22,7 +22,7 @@ pub enum TopLevelDeclNode<'a> {
 #[derive(Debug, PartialEq)]
 pub struct BindingDeclSpecNode<'a> {
     pub mapping: Vec<(Span<'a>, ExprNode<'a>)>,
-    // TODO: pub r#type: Option<___>
+    pub r#type: Option<TypeNode<'a>>,
 }
 
 #[derive(Debug)]
@@ -32,15 +32,27 @@ impl<'a> BindingDeclSpecNode<'a> {
     pub fn try_new(
         ids: Vec<Span<'a>>,
         exprs: Vec<ExprNode<'a>>,
+        r#type: Option<TypeNode<'a>>,
     ) -> Result<Self, MismatchingBindingDeclSpecListsLength> {
         if ids.len() != exprs.len() {
             Err(MismatchingBindingDeclSpecListsLength {})
         } else {
             Ok(Self {
                 mapping: ids.into_iter().zip(exprs).collect(),
+                r#type,
             })
         }
     }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum TypeNode<'a> {
+    Name {
+        package: Option<Span<'a>>, // for qualified type names
+        id: Span<'a>,
+        args: Vec<TypeNode<'a>>,
+    },
+    // TODO: Literal
 }
 
 #[derive(Debug, PartialEq)]

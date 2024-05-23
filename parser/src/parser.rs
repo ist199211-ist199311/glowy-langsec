@@ -9,6 +9,7 @@ use crate::{
 
 mod decls;
 mod exprs;
+mod types;
 
 type PResult<'a, T> = Result<T, ParsingError<'a>>;
 
