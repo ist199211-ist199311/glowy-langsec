@@ -6,10 +6,51 @@ pub enum TokenKind {
 
     Comma,  // ,
     Period, // .
-    Assign, // =
+    Colon,  // :
 
     ParenL, // (
     ParenR, // )
+
+    Plus,    // +
+    Minus,   // -
+    Star,    //_*
+    Slash,   // /
+    Percent, // %
+    Caret,   // ^
+    Excl,    //_!
+
+    Amp,        // &
+    Pipe,       // |
+    DoubleAmp,  // &&
+    DoublePipe, // ||
+    AmpCaret,   // &^
+
+    DoubleEq, // ==
+    NotEq,    //_!=
+    Lt,       // <
+    Gt,       // >
+    LtEq,     // <=
+    GtEq,     // >=
+    DoubleLt, // <<
+    DoubleGt, // >>
+    LtMinus,  // <-
+
+    PlusPlus,   // ++
+    MinusMinus, // --
+
+    Assign,         // =
+    ColonAssign,    // :=
+    PlusAssign,     // +=
+    MinusAssign,    // -=
+    StarAssign,     //_*=
+    SlashAssign,    // /=
+    PercentAssign,  // %=
+    CaretAssign,    // ^=
+    AmpAssign,      // &=
+    PipeAssign,     // |=
+    DoubleLtAssign, // <<=
+    DoubleGtAssign, // >>=
+    AmpCaretAssign, // &^=
 
     Int(u64), // 3
 

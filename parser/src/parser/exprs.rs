@@ -6,6 +6,8 @@ use crate::{
     ParsingError, TokenStream,
 };
 
+mod ops;
+
 fn parse_operand_name<'a>(s: &mut TokenStream<'a>) -> PResult<'a, OperandNameNode<'a>> {
     let token = expect(s, TokenKind::Ident, Some("operand name"))?;
 
@@ -24,16 +26,26 @@ fn parse_operand_name<'a>(s: &mut TokenStream<'a>) -> PResult<'a, OperandNameNod
     }
 }
 
-pub fn parse_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
+pub fn parse_primary_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
     match s.peek().cloned().transpose()? {
         Some(of_kind!(TokenKind::Ident)) => Ok(parse_operand_name(s)?.into()),
         Some(of_kind!(TokenKind::Int(v))) => {
             s.next(); // advance
             Ok(LiteralNode::Int(v).into())
         }
+        Some(of_kind!(TokenKind::ParenL)) => {
+            s.next(); // advance
+            let inner = parse_expression(s)?;
+            expect(s, TokenKind::ParenR, Some("parenthesized expression"))?;
+            Ok(inner)
+        }
         found => Err(ParsingError::UnexpectedConstruct {
-            expected: "an expression",
+            expected: "a primary expression",
             found,
         }),
     }
+}
+
+pub fn parse_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
+    ops::parse_expression_bp(s, 0)
 }

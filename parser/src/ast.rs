@@ -45,7 +45,35 @@ impl<'a> ConstDeclSpecNode<'a> {
 pub enum ExprNode<'a> {
     Name(OperandNameNode<'a>),
     Literal(LiteralNode),
-    // TODO: more expressions...
+    // TODO: more primary expressions...
+    BinaryOp {
+        kind: BinaryOpKind,
+        left: Box<ExprNode<'a>>,
+        right: Box<ExprNode<'a>>,
+    },
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BinaryOpKind {
+    Eq,         // x == y
+    NotEq,      // x != y
+    Less,       // x < y
+    LessEq,     // x <= y
+    Greater,    // x > y
+    GreaterEq,  // x >= y
+    Sum,        // x + y
+    Diff,       // x - y
+    Product,    // x * y
+    Quotient,   // x / y
+    Remainder,  // x % y
+    ShiftLeft,  // x << y
+    ShiftRight, // x >> y
+    BitwiseOr,  // x | y
+    BitwiseAnd, // x & y
+    BitwiseXor, // x ^ y
+    BitClear,   // x &^ y (AND NOT)
+    LogicalAnd, // x && y
+    LogicalOr,  // x || y
 }
 
 impl<'a> From<OperandNameNode<'a>> for ExprNode<'a> {
