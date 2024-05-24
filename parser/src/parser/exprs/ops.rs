@@ -76,7 +76,7 @@ pub fn parse_expression_bp<'a>(s: &mut TokenStream<'a>, min_bp: u8) -> PResult<'
     Ok(lhs)
 }
 
-pub struct UnknownOpKind();
+pub struct UnknownOpKind;
 
 impl TryFrom<TokenKind> for UnaryOpKind {
     type Error = UnknownOpKind;
@@ -90,7 +90,7 @@ impl TryFrom<TokenKind> for UnaryOpKind {
             TokenKind::Star => Self::Deref,
             TokenKind::Amp => Self::Address,
             TokenKind::LtMinus => Self::Receive,
-            _ => return Err(UnknownOpKind {}),
+            _ => return Err(UnknownOpKind),
         };
 
         Ok(op)
@@ -121,7 +121,7 @@ impl TryFrom<TokenKind> for BinaryOpKind {
             TokenKind::AmpCaret => Self::BitClear,
             TokenKind::DoubleAmp => Self::LogicalAnd,
             TokenKind::DoublePipe => Self::LogicalOr,
-            _ => return Err(UnknownOpKind {}),
+            _ => return Err(UnknownOpKind),
         };
 
         Ok(op)
@@ -157,11 +157,7 @@ mod tests {
                             kind: UnaryOpKind::Negation,
                             operand: Box::new(ExprNode::Name(OperandNameNode {
                                 package: None,
-                                id: Span {
-                                    content: "a",
-                                    offset: 6,
-                                    line: 1
-                                }
+                                id: Span::new("a", 6, 1)
                             }))
                         }),
                         right: Box::new(ExprNode::Literal(LiteralNode::Int(3)))
@@ -171,11 +167,7 @@ mod tests {
                     kind: BinaryOpKind::LogicalAnd,
                     left: Box::new(ExprNode::Name(OperandNameNode {
                         package: None,
-                        id: Span {
-                            content: "b",
-                            offset: 15,
-                            line: 1
-                        }
+                        id: Span::new("b", 15, 1)
                     })),
                     right: Box::new(ExprNode::BinaryOp {
                         kind: BinaryOpKind::Eq,
@@ -198,11 +190,7 @@ mod tests {
                                 left: Box::new(ExprNode::Literal(LiteralNode::Int(2))),
                                 right: Box::new(ExprNode::Name(OperandNameNode {
                                     package: None,
-                                    id: Span {
-                                        content: "abc",
-                                        offset: 42,
-                                        line: 1
-                                    }
+                                    id: Span::new("abc", 42, 1)
                                 }))
                             })
                         })

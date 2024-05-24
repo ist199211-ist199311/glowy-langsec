@@ -458,59 +458,31 @@ mod tests {
             vec![
                 Token {
                     kind: TokenKind::Int(3),
-                    span: Span {
-                        content: "3",
-                        offset: 2,
-                        line: 1
-                    }
+                    span: Span::new("3", 2, 1)
                 },
                 Token {
                     kind: TokenKind::Int(50),
-                    span: Span {
-                        content: "50",
-                        offset: 4,
-                        line: 1
-                    }
+                    span: Span::new("50", 4, 1)
                 },
                 Token {
                     kind: TokenKind::Int(29),
-                    span: Span {
-                        content: "0b11101",
-                        offset: 7,
-                        line: 1
-                    }
+                    span: Span::new("0b11101", 7, 1)
                 },
                 Token {
                     kind: TokenKind::Int(505),
-                    span: Span {
-                        content: "0o771",
-                        offset: 15,
-                        line: 1
-                    }
+                    span: Span::new("0o771", 15, 1)
                 },
                 Token {
                     kind: TokenKind::Int(3909),
-                    span: Span {
-                        content: "0xf45",
-                        offset: 21,
-                        line: 1
-                    }
+                    span: Span::new("0xf45", 21, 1)
                 },
                 Token {
                     kind: TokenKind::Int(123),
-                    span: Span {
-                        content: "0123",
-                        offset: 28,
-                        line: 2
-                    }
+                    span: Span::new("0123", 28, 2)
                 },
                 Token {
                     kind: TokenKind::Int(0),
-                    span: Span {
-                        content: "0",
-                        offset: 33,
-                        line: 2
-                    }
+                    span: Span::new("0", 33, 2)
                 }
             ],
             lex("\t 3 50 0b11101 0o771 0xf45\n 0123 0").unwrap()
@@ -523,75 +495,39 @@ mod tests {
             vec![
                 Token {
                     kind: TokenKind::Gt,
-                    span: Span {
-                        content: ">",
-                        offset: 0,
-                        line: 1
-                    }
+                    span: Span::new(">", 0, 1)
                 },
                 Token {
                     kind: TokenKind::Excl,
-                    span: Span {
-                        content: "!",
-                        offset: 2,
-                        line: 1
-                    }
+                    span: Span::new("!", 2, 1)
                 },
                 Token {
                     kind: TokenKind::DoubleEq,
-                    span: Span {
-                        content: "==",
-                        offset: 4,
-                        line: 1
-                    }
+                    span: Span::new("==", 4, 1)
                 },
                 Token {
                     kind: TokenKind::NotEq,
-                    span: Span {
-                        content: "!=",
-                        offset: 7,
-                        line: 1
-                    }
+                    span: Span::new("!=", 7, 1)
                 },
                 Token {
                     kind: TokenKind::AmpCaret,
-                    span: Span {
-                        content: "&^",
-                        offset: 10,
-                        line: 1
-                    }
+                    span: Span::new("&^", 10, 1)
                 },
                 Token {
                     kind: TokenKind::AmpCaretAssign,
-                    span: Span {
-                        content: "&^=",
-                        offset: 13,
-                        line: 1
-                    }
+                    span: Span::new("&^=", 13, 1)
                 },
                 Token {
                     kind: TokenKind::Comma,
-                    span: Span {
-                        content: ",",
-                        offset: 17,
-                        line: 1
-                    }
+                    span: Span::new(",", 17, 1)
                 },
                 Token {
                     kind: TokenKind::DoubleGt,
-                    span: Span {
-                        content: ">>",
-                        offset: 19,
-                        line: 1
-                    }
+                    span: Span::new(">>", 19, 1)
                 },
                 Token {
                     kind: TokenKind::Gt,
-                    span: Span {
-                        content: ">",
-                        offset: 21,
-                        line: 1
-                    }
+                    span: Span::new(">", 21, 1)
                 }
             ],
             lex("> ! == != &^ &^= , >>>").unwrap()
