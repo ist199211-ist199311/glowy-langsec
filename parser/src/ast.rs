@@ -170,6 +170,16 @@ pub type BlockNode<'a> = Vec<StatementNode<'a>>;
 
 #[derive(Debug, PartialEq)]
 pub enum StatementNode<'a> {
-    // TODO: support statements
-    Placeholder(Span<'a>),
+    Empty,
+    Block(BlockNode<'a>),
+    Expr(ExprNode<'a>),
+    Send(SendNode<'a>),
+    Inc(ExprNode<'a>),
+    Dec(ExprNode<'a>),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SendNode<'a> {
+    pub channel: ExprNode<'a>,
+    pub expr: ExprNode<'a>,
 }

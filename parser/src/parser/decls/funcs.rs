@@ -1,6 +1,6 @@
 use crate::{
     ast::{FunctionDeclNode, FunctionParamDeclNode, FunctionResultNode, FunctionSignatureNode},
-    parser::{expect, of_kind, types::parse_type, PResult},
+    parser::{expect, of_kind, stmts::parse_block, types::parse_type, PResult},
     token::{Token, TokenKind},
     ParsingError, TokenStream,
 };
@@ -105,8 +105,7 @@ pub fn parse_function_decl<'a>(s: &mut TokenStream<'a>) -> PResult<'a, FunctionD
 
     let signature = parse_signature(s)?;
 
-    // TODO: support body
-    let body = vec![];
+    let body = parse_block(s)?;
 
     Ok(FunctionDeclNode {
         name,
