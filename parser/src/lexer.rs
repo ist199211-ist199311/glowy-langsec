@@ -132,6 +132,19 @@ impl<'a> Lexer<'a> {
         self.accumulate_while((), |ch, _, _| cond(ch)).0
     }
 
+    fn read_n<const N: usize>(&mut self) -> Span<'a> {
+        let (span, _) = self.accumulate_while(0, |_, count, _| {
+            if *count < N {
+                *count += 1;
+                true
+            } else {
+                false
+            }
+        });
+
+        span
+    }
+
     fn identifier_or_keyword(&mut self) -> Token<'a> {
         let ident = self.read_while(|ch| is_letter(ch) || is_unicode_digit(ch));
 
@@ -222,6 +235,20 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn period_or_ellipsis(&mut self) -> Token<'a> {
+        // cannot use greedy since ".." is not a valid token..
+
+        let view = self.src.as_str();
+
+        if view.len() >= 3 && &view[..3] == "..." {
+            Token::new(TokenKind::Ellipsis, self.read_n::<3>())
+        } else if self.peek_char() == Some('.') {
+            Token::new(TokenKind::Period, self.read_span().unwrap())
+        } else {
+            unreachable!("invoker code did not check for a period!")
+        }
+    }
+
     fn greedy(&mut self, tree: &TokenOptionsTree<'static>) -> Token<'a> {
         // cannot pass tree directly as initial state since the first
         // iteration needs to take place before any checking so that
@@ -289,14 +316,13 @@ impl<'a> Iterator for Lexer<'a> {
 
         let token = match self.peek_char() {
             Some(';') => single_char_token!(TokenKind::SemiColon),
-
             Some(',') => single_char_token!(TokenKind::Comma),
-            Some('.') => single_char_token!(TokenKind::Period),
-
             Some('(') => single_char_token!(TokenKind::ParenL),
             Some(')') => single_char_token!(TokenKind::ParenR),
             Some('[') => single_char_token!(TokenKind::SquareL),
             Some(']') => single_char_token!(TokenKind::SquareR),
+            Some('{') => single_char_token!(TokenKind::CurlyL),
+            Some('}') => single_char_token!(TokenKind::CurlyR),
 
             Some(':') => single_or_eq!(TokenKind::Colon, TokenKind::ColonAssign),
             Some('*') => single_or_eq!(TokenKind::Star, TokenKind::StarAssign),
@@ -324,6 +350,8 @@ impl<'a> Iterator for Lexer<'a> {
                 TokenKind::DoublePipe,
                 TokenKind::PipeAssign
             ),
+
+            Some('.') => self.period_or_ellipsis(),
 
             Some('&') => self.greedy(&tree!(
                 TokenKind::Amp,

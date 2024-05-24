@@ -16,6 +16,13 @@ pub struct PackageClauseNode<'a> {
 pub enum TopLevelDeclNode<'a> {
     Const(Vec<BindingDeclSpecNode<'a>>),
     Var(Vec<BindingDeclSpecNode<'a>>),
+    Function(FunctionDeclNode<'a>),
+}
+
+impl<'a> From<FunctionDeclNode<'a>> for TopLevelDeclNode<'a> {
+    fn from(node: FunctionDeclNode<'a>) -> Self {
+        Self::Function(node)
+    }
 }
 
 // binding = const or var, since specs look the same for both
@@ -53,6 +60,37 @@ pub enum TypeNode<'a> {
         args: Vec<TypeNode<'a>>,
     },
     // TODO: Literal
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionDeclNode<'a> {
+    pub name: Span<'a>,
+    // TODO: pub type_params: Vec<___>,
+    pub signature: FunctionSignatureNode<'a>,
+    /// note: this parser intentionally does not support omitted bodies!
+    /// (it would defeat the purpose of information flow control, and
+    ///  make parsing much more complicated due to 2 optional elements
+    ///  in a row, namely signature result and body)
+    pub body: BlockNode<'a>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionSignatureNode<'a> {
+    pub params: Vec<FunctionParamDeclNode<'a>>,
+    pub result: FunctionResultNode<'a>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum FunctionResultNode<'a> {
+    Single(TypeNode<'a>),
+    Params(Vec<FunctionParamDeclNode<'a>>),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionParamDeclNode<'a> {
+    pub ids: Vec<Span<'a>>,
+    pub variadic: bool, // whether type is ...T
+    pub r#type: TypeNode<'a>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -126,4 +164,12 @@ pub struct OperandNameNode<'a> {
 #[derive(Debug, PartialEq)]
 pub enum LiteralNode {
     Int(u64),
+}
+
+pub type BlockNode<'a> = Vec<StatementNode<'a>>;
+
+#[derive(Debug, PartialEq)]
+pub enum StatementNode<'a> {
+    // TODO: support statements
+    Placeholder(Span<'a>),
 }

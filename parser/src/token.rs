@@ -4,14 +4,17 @@ use crate::Span;
 pub enum TokenKind {
     SemiColon, // ;
 
-    Comma,  // ,
-    Period, // .
-    Colon,  // :
+    Comma,    // ,
+    Period,   // .
+    Colon,    // :
+    Ellipsis, // ...
 
     ParenL,  // (
     ParenR,  // )
     SquareL, // [
     SquareR, // ]
+    CurlyL,  // {
+    CurlyR,  // }
 
     Plus,    // +
     Minus,   // -
@@ -60,6 +63,7 @@ pub enum TokenKind {
 
     // keywords
     Const,
+    Func,
     Package,
     Var,
 }
@@ -78,6 +82,7 @@ impl<'a> Token<'a> {
     pub fn from_identifier_or_keyword(span: Span<'a>) -> Self {
         let kind = match span.content {
             "const" => TokenKind::Const,
+            "func" => TokenKind::Func,
             "package" => TokenKind::Package,
             "var" => TokenKind::Var,
             _ => TokenKind::Ident,
