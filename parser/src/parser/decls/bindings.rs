@@ -8,7 +8,7 @@ use crate::{
 // bindings is our term for constants and variables,
 // since their declarations look the same, allowing code reuse
 
-pub enum BindingKind {
+enum BindingKind {
     Const,
     Var,
 }
@@ -127,7 +127,7 @@ fn parse_specs_list<'a>(
     Ok(specs)
 }
 
-pub fn parse_binding_decl<'a>(
+fn parse_binding_decl<'a>(
     s: &mut TokenStream<'a>,
     kind: BindingKind,
 ) -> PResult<'a, TopLevelDeclNode<'a>> {
@@ -145,4 +145,12 @@ pub fn parse_binding_decl<'a>(
     };
 
     Ok(kind.build_node(specs))
+}
+
+pub fn parse_const_decl<'a>(s: &mut TokenStream<'a>) -> PResult<'a, TopLevelDeclNode<'a>> {
+    parse_binding_decl(s, BindingKind::Const)
+}
+
+pub fn parse_var_decl<'a>(s: &mut TokenStream<'a>) -> PResult<'a, TopLevelDeclNode<'a>> {
+    parse_binding_decl(s, BindingKind::Var)
 }
