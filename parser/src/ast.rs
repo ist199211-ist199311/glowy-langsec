@@ -77,7 +77,7 @@ pub struct FunctionDeclNode<'a> {
 #[derive(Debug, PartialEq)]
 pub struct FunctionSignatureNode<'a> {
     pub params: Vec<FunctionParamDeclNode<'a>>,
-    pub result: FunctionResultNode<'a>,
+    pub result: Option<FunctionResultNode<'a>>,
 }
 
 #[derive(Debug, PartialEq)]

@@ -81,10 +81,10 @@ fn parse_params<'a>(s: &mut TokenStream<'a>) -> PResult<'a, Vec<FunctionParamDec
 fn parse_signature<'a>(s: &mut TokenStream<'a>) -> PResult<'a, FunctionSignatureNode<'a>> {
     let params = parse_params(s)?;
 
-    let result = if let Some(Ok(of_kind!(TokenKind::ParenL))) = s.peek() {
-        FunctionResultNode::Params(parse_params(s)?)
-    } else {
-        FunctionResultNode::Single(parse_type(s)?)
+    let result = match s.peek().cloned().transpose()? {
+        Some(of_kind!(TokenKind::CurlyL)) => None,
+        Some(of_kind!(TokenKind::ParenL)) => Some(FunctionResultNode::Params(parse_params(s)?)),
+        _ => Some(FunctionResultNode::Single(parse_type(s)?)),
     };
 
     Ok(FunctionSignatureNode { params, result })
