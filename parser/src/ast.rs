@@ -176,10 +176,41 @@ pub enum StatementNode<'a> {
     Send(SendNode<'a>),
     Inc(ExprNode<'a>),
     Dec(ExprNode<'a>),
+    Assignment(AssignmentNode<'a>),
+    ShortVarDecl(ShortVarDeclNode<'a>),
 }
 
 #[derive(Debug, PartialEq)]
 pub struct SendNode<'a> {
     pub channel: ExprNode<'a>,
     pub expr: ExprNode<'a>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct AssignmentNode<'a> {
+    pub kind: AssignmentKind,
+    pub lhs: Vec<ExprNode<'a>>,
+    pub rhs: Vec<ExprNode<'a>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AssignmentKind {
+    Simple,     //   =
+    Sum,        //  +=
+    Diff,       //  -=
+    Product,    //_ *=
+    Quotient,   //  /=
+    Remainder,  //  %=
+    ShiftLeft,  // <<=
+    ShiftRight, // >>=
+    BitwiseOr,  //  |=
+    BitwiseAnd, //  &=
+    BitwiseXor, //  ^=
+    BitClear,   // &^=
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ShortVarDeclNode<'a> {
+    pub ids: Vec<Span<'a>>,
+    pub exprs: Vec<ExprNode<'a>>,
 }

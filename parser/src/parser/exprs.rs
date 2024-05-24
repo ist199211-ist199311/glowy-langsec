@@ -49,3 +49,54 @@ pub fn parse_primary_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, Expr
 pub fn parse_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
     ops::parse_expression_bp(s, 0)
 }
+
+pub fn parse_expressions_list<'a, F, R, E>(
+    s: &mut TokenStream<'a>,
+    stop_cond: F,
+) -> PResult<'a, Option<(Vec<ExprNode<'a>>, R)>>
+where
+    F: Fn(Token<'a>) -> Result<R, E>,
+{
+    let mut exprs = vec![];
+
+    let mut over = false;
+
+    while let Some(Ok(token)) = s.peek().cloned() {
+        if let Ok(res) = stop_cond(token) {
+            return Ok(Some((exprs, res)));
+        }
+
+        if over {
+            // 2 non-comma-separated expressions in a row are not allowed
+            expect(s, TokenKind::Comma, Some("expressions list"))?;
+            // (^^ we know this will error, that's the point)
+        }
+
+        exprs.push(parse_expression(s)?);
+
+        if let Some(Ok(of_kind!(TokenKind::Comma))) = s.peek() {
+            s.next(); // advance
+        } else {
+            // the next token must be an assignment operator,
+            // otherwise something's wrong -- this will be checked
+            // at the beginning of the next loop iteration
+            over = true;
+        }
+    }
+
+    Ok(None)
+}
+
+// TODO: rename this to something better...
+pub fn parse_expressions_list_bool<'a, F>(
+    s: &mut TokenStream<'a>,
+    stop_cond: F,
+) -> PResult<'a, Option<Vec<ExprNode<'a>>>>
+where
+    F: Fn(Token<'a>) -> bool,
+{
+    Ok(
+        parse_expressions_list(s, |token| stop_cond(token).then_some(()).ok_or(()))?
+            .map(|(exprs, _)| exprs),
+    )
+}

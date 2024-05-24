@@ -105,7 +105,7 @@ impl<'a> Lexer<'a> {
 
     fn accumulate_while<F, S>(&mut self, initial: S, func: F) -> (Span<'a>, S)
     where
-        F: Fn(char, &mut S, &mut Self) -> bool,
+        F: Fn(char, &mut S, &mut Self) -> bool, // FIXME: rewrite using FnMut?
     {
         let (original_offset, original_line) = (self.offset, self.line);
 
