@@ -63,7 +63,9 @@ pub enum TokenKind {
 
     // keywords
     Const,
+    Else,
     Func,
+    If,
     Package,
     Var,
 }
@@ -82,7 +84,9 @@ impl<'a> Token<'a> {
     pub fn from_identifier_or_keyword(span: Span<'a>) -> Self {
         let kind = match span.content {
             "const" => TokenKind::Const,
+            "else" => TokenKind::Else,
             "func" => TokenKind::Func,
+            "if" => TokenKind::If,
             "package" => TokenKind::Package,
             "var" => TokenKind::Var,
             _ => TokenKind::Ident,

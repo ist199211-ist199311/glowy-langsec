@@ -178,6 +178,43 @@ pub enum StatementNode<'a> {
     Dec(ExprNode<'a>),
     Assignment(AssignmentNode<'a>),
     ShortVarDecl(ShortVarDeclNode<'a>),
+    If(IfNode<'a>),
+}
+
+impl<'a> From<BlockNode<'a>> for StatementNode<'a> {
+    fn from(node: BlockNode<'a>) -> Self {
+        Self::Block(node)
+    }
+}
+
+impl<'a> From<ExprNode<'a>> for StatementNode<'a> {
+    fn from(node: ExprNode<'a>) -> Self {
+        Self::Expr(node)
+    }
+}
+
+impl<'a> From<SendNode<'a>> for StatementNode<'a> {
+    fn from(node: SendNode<'a>) -> Self {
+        Self::Send(node)
+    }
+}
+
+impl<'a> From<AssignmentNode<'a>> for StatementNode<'a> {
+    fn from(node: AssignmentNode<'a>) -> Self {
+        Self::Assignment(node)
+    }
+}
+
+impl<'a> From<ShortVarDeclNode<'a>> for StatementNode<'a> {
+    fn from(node: ShortVarDeclNode<'a>) -> Self {
+        Self::ShortVarDecl(node)
+    }
+}
+
+impl<'a> From<IfNode<'a>> for StatementNode<'a> {
+    fn from(node: IfNode<'a>) -> Self {
+        Self::If(node)
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -213,4 +250,18 @@ pub enum AssignmentKind {
 pub struct ShortVarDeclNode<'a> {
     pub ids: Vec<Span<'a>>,
     pub exprs: Vec<ExprNode<'a>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IfNode<'a> {
+    // TODO: pub stmt: Box<StatementNode<'a>>,
+    pub cond: ExprNode<'a>,
+    pub then: BlockNode<'a>,
+    pub otherwise: Option<ElseNode<'a>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ElseNode<'a> {
+    If(Box<IfNode<'a>>),
+    Block(BlockNode<'a>),
 }

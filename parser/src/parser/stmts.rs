@@ -1,3 +1,4 @@
+use self::flow::parse_if_statement;
 use super::{
     expect,
     exprs::{parse_expression, parse_expressions_list, parse_expressions_list_bool},
@@ -12,6 +13,8 @@ use crate::{
     token::{Token, TokenKind},
     ParsingError, TokenStream,
 };
+
+mod flow;
 
 // continue from the right-hand side
 fn resume_parsing_assignment_rhs<'a>(
@@ -127,6 +130,11 @@ fn parse_assignment_or_short_var_decl<'a>(
                     .into_iter()
                     .map(|id| ExprNode::Name(OperandNameNode { package: None, id }))
                     .collect::<Vec<_>>();
+
+                // FIXME: this is somewhat wrong! there must be a way to
+                // defer to `parse_expression_first_stmt`, otherwise
+                // expressions such as `m` or `m--` are not accepted as stmts!
+
                 return resume_parsing_assignment_lhs(s, exprs);
             }
         }
@@ -144,10 +152,16 @@ fn parse_assignment_or_short_var_decl<'a>(
     }
 }
 
-fn parse_statement<'a>(s: &mut TokenStream<'a>) -> PResult<'a, StatementNode<'a>> {
+fn parse_statement<'a>(
+    s: &mut TokenStream<'a>,
+    allow_non_simple: bool,
+) -> PResult<'a, StatementNode<'a>> {
     let node = match s.peek().cloned().transpose()? {
         Some(of_kind!(TokenKind::SemiColon)) => StatementNode::Empty,
-        Some(of_kind!(TokenKind::CurlyL)) => StatementNode::Block(parse_block(s)?),
+        Some(of_kind!(TokenKind::CurlyL)) if allow_non_simple => {
+            StatementNode::Block(parse_block(s)?)
+        }
+        Some(of_kind!(TokenKind::If)) if allow_non_simple => parse_if_statement(s)?.into(),
         Some(of_kind!(TokenKind::Ident)) => parse_assignment_or_short_var_decl(s)?,
         _ => parse_expression_first_stmt(s)?,
     };
@@ -161,7 +175,7 @@ pub fn parse_block<'a>(s: &mut TokenStream<'a>) -> PResult<'a, BlockNode<'a>> {
     let mut stmts = vec![];
 
     while !matches!(s.peek(), Some(Ok(of_kind!(TokenKind::CurlyR)))) {
-        stmts.push(parse_statement(s)?);
+        stmts.push(parse_statement(s, true)?);
         expect(s, TokenKind::SemiColon, Some("block"))?;
     }
 
