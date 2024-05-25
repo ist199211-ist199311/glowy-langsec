@@ -79,7 +79,7 @@ impl<'a> Lexer<'a> {
 
     fn read_char(&mut self) -> Option<char> {
         if let Some(ch) = self.src.next() {
-            self.offset += 1;
+            self.offset += ch.len_utf8();
 
             if ch == '\n' {
                 self.line += 1;
@@ -96,8 +96,9 @@ impl<'a> Lexer<'a> {
 
         let view = self.src.as_str();
 
-        if self.read_char().is_some() {
-            Some(Span::new(&view[..1], original_offset, original_line))
+        if let Some(ch) = self.read_char() {
+            let n = ch.len_utf8();
+            Some(Span::new(&view[..n], original_offset, original_line))
         } else {
             None
         }
@@ -116,7 +117,7 @@ impl<'a> Lexer<'a> {
             if !func(ch, &mut state, self) {
                 break;
             }
-            len += 1;
+            len += ch.len_utf8();
             self.read_char(); // advance iterator
         }
 
@@ -238,11 +239,13 @@ impl<'a> Lexer<'a> {
     fn period_or_ellipsis(&mut self) -> Token<'a> {
         // cannot use greedy since ".." is not a valid token..
 
-        let view = self.src.as_str();
+        // we can't use &view[..3] == "..." because ..3 might fall
+        // outside char boundaries, e.g. "..ü" would panic
+        let upcoming: Vec<_> = self.src.clone().take(3).collect();
 
-        if view.len() >= 3 && &view[..3] == "..." {
+        if upcoming.len() == 3 && upcoming.iter().all(|x| *x == '.') {
             Token::new(TokenKind::Ellipsis, self.read_n::<3>())
-        } else if self.peek_char() == Some('.') {
+        } else if upcoming.first() == Some(&'.') {
             Token::new(TokenKind::Period, self.read_span().unwrap())
         } else {
             unreachable!("invoker code did not check for a period!")
