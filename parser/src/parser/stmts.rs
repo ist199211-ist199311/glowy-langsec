@@ -1,5 +1,6 @@
 use self::flow::parse_if_statement;
 use super::{
+    decls::bindings::{parse_const_decl, parse_var_decl},
     expect,
     exprs::{parse_expression, parse_expressions_list, parse_expressions_list_bool},
     PResult,
@@ -176,6 +177,11 @@ fn parse_statement<'a>(
             StatementNode::Block(parse_block(s)?)
         }
         Some(of_kind!(TokenKind::If)) if allow_non_simple => parse_if_statement(s)?.into(),
+
+        // declarations (sadly cannot be abstracted, indistinguishable if not for keywords)
+        Some(of_kind!(TokenKind::Const)) => parse_const_decl(s)?.into(),
+        Some(of_kind!(TokenKind::Var)) => parse_var_decl(s)?.into(),
+
         Some(of_kind!(TokenKind::Ident)) => parse_assignment_or_short_var_decl(s)?,
         _ => parse_expression_first_stmt(s, None)?,
     };

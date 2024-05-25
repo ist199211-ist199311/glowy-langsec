@@ -3,8 +3,8 @@ use crate::Span;
 #[derive(Debug, PartialEq)]
 pub struct SourceFileNode<'a> {
     pub package_clause: PackageClauseNode<'a>,
-    // TODO: pub imports: Vec<TopLevelDeclNode<'a>>,
-    pub top_level_decls: Vec<TopLevelDeclNode<'a>>,
+    // TODO: pub imports: Vec<ImportNode<'a>>,
+    pub top_level_decls: Vec<DeclNode<'a>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -13,13 +13,13 @@ pub struct PackageClauseNode<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum TopLevelDeclNode<'a> {
+pub enum DeclNode<'a> {
     Const(Vec<BindingDeclSpecNode<'a>>),
     Var(Vec<BindingDeclSpecNode<'a>>),
     Function(FunctionDeclNode<'a>),
 }
 
-impl<'a> From<FunctionDeclNode<'a>> for TopLevelDeclNode<'a> {
+impl<'a> From<FunctionDeclNode<'a>> for DeclNode<'a> {
     fn from(node: FunctionDeclNode<'a>) -> Self {
         Self::Function(node)
     }
@@ -170,21 +170,19 @@ pub type BlockNode<'a> = Vec<StatementNode<'a>>;
 
 #[derive(Debug, PartialEq)]
 pub enum StatementNode<'a> {
+    // simple
     Empty,
-    Block(BlockNode<'a>),
     Expr(ExprNode<'a>),
     Send(SendNode<'a>),
     Inc(ExprNode<'a>),
     Dec(ExprNode<'a>),
     Assignment(AssignmentNode<'a>),
     ShortVarDecl(ShortVarDeclNode<'a>),
-    If(IfNode<'a>),
-}
 
-impl<'a> From<BlockNode<'a>> for StatementNode<'a> {
-    fn from(node: BlockNode<'a>) -> Self {
-        Self::Block(node)
-    }
+    // non-simple
+    Decl(DeclNode<'a>),
+    If(IfNode<'a>),
+    Block(BlockNode<'a>),
 }
 
 impl<'a> From<ExprNode<'a>> for StatementNode<'a> {
@@ -211,9 +209,21 @@ impl<'a> From<ShortVarDeclNode<'a>> for StatementNode<'a> {
     }
 }
 
+impl<'a> From<DeclNode<'a>> for StatementNode<'a> {
+    fn from(node: DeclNode<'a>) -> Self {
+        Self::Decl(node)
+    }
+}
+
 impl<'a> From<IfNode<'a>> for StatementNode<'a> {
     fn from(node: IfNode<'a>) -> Self {
         Self::If(node)
+    }
+}
+
+impl<'a> From<BlockNode<'a>> for StatementNode<'a> {
+    fn from(node: BlockNode<'a>) -> Self {
+        Self::Block(node)
     }
 }
 
