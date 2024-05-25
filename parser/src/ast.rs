@@ -16,11 +16,11 @@ pub struct PackageClauseNode<'a> {
 pub enum DeclNode<'a> {
     Const {
         specs: Vec<BindingDeclSpecNode<'a>>,
-        annotation: Option<Box<Annotation>>,
+        annotation: Option<Box<Annotation<'a>>>,
     },
     Var {
         specs: Vec<BindingDeclSpecNode<'a>>,
-        annotation: Option<Box<Annotation>>,
+        annotation: Option<Box<Annotation<'a>>>,
     },
     Function(FunctionDeclNode<'a>),
 }

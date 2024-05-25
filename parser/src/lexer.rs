@@ -61,7 +61,7 @@ pub struct Lexer<'a> {
     line: usize,   // 1-indexed
 
     annotation_regex: Regex, // prevent constant recompilation (slow)
-    last_annotation: Option<Annotation>, // prevent clearing by whitespace
+    last_annotation: Option<Annotation<'a>>, // prevent clearing by whitespace
 }
 
 type LResult<'a> = Result<Token<'a>, LexingError<'a>>;
@@ -167,12 +167,11 @@ impl<'a> Lexer<'a> {
                     let text = self.read_while(|ch| ch != '\n').content;
 
                     if let Some(captures) = self.annotation_regex.captures(text) {
-                        let scope = captures["scope"].to_owned();
-                        let labels = captures["labels"]
+                        let scope = &text[captures.name("scope").unwrap().range()];
+                        let labels = text[captures.name("labels").unwrap().range()]
                             .split(',')
                             .map(str::trim)
                             .filter(|label| !label.is_empty())
-                            .map(str::to_owned)
                             .collect();
 
                         self.last_annotation = Some(Annotation { scope, labels });

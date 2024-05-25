@@ -45,7 +45,7 @@ impl BindingKind {
     fn build_node<'a>(
         &self,
         specs: Vec<BindingDeclSpecNode<'a>>,
-        annotation: Option<Box<Annotation>>,
+        annotation: Option<Box<Annotation<'a>>>,
     ) -> DeclNode<'a> {
         match self {
             Self::Const => DeclNode::Const { specs, annotation },
