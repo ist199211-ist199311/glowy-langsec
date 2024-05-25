@@ -146,6 +146,35 @@ impl<'a> Lexer<'a> {
         span
     }
 
+    fn skip_comments(&mut self) {
+        // cloned so we can peek freely
+        let mut it = self.src.clone();
+
+        if let Some('/') = it.next() {
+            match it.next() {
+                Some('/') => {
+                    // line comment
+
+                    self.read_n::<2>(); // step over //
+                    self.read_while(|ch| ch != '\n');
+                }
+                Some('*') => {
+                    // general comment
+
+                    self.read_n::<2>(); // step over /*
+                    loop {
+                        self.read_while(|ch| ch != '*');
+                        self.read_char(); // step over *
+                        if let Some('/') = self.read_char() {
+                            break;
+                        }
+                    }
+                }
+                _ => {} // not a comment
+            }
+        }
+    }
+
     fn identifier_or_keyword(&mut self) -> Token<'a> {
         let ident = self.read_while(|ch| is_letter(ch) || is_unicode_digit(ch));
 
@@ -316,6 +345,8 @@ impl<'a> Iterator for Lexer<'a> {
                 ))
             };
         }
+
+        self.skip_comments();
 
         let token = match self.peek_char() {
             Some(';') => single_char_token!(TokenKind::SemiColon),
