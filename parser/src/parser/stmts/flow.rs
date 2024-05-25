@@ -92,7 +92,30 @@ mod tests {
                         ids: vec![Span::new("k", 197, 7)],
                         exprs: vec![ExprNode::Literal(LiteralNode::Int(3))]
                     })],
-                    otherwise: Some(ElseNode::Block(vec![StatementNode::Block(vec![])]))
+                    otherwise: Some(ElseNode::Block(vec![
+                        StatementNode::Block(vec![]),
+                        StatementNode::Dec(ExprNode::Name(OperandNameNode {
+                            package: None,
+                            id: Span::new("m", 298, 10)
+                        })),
+                        StatementNode::Assignment(AssignmentNode {
+                            kind: AssignmentKind::BitClear,
+                            lhs: vec![
+                                ExprNode::Name(OperandNameNode {
+                                    package: None,
+                                    id: Span::new("k", 331, 11)
+                                }),
+                                ExprNode::Name(OperandNameNode {
+                                    package: None,
+                                    id: Span::new("r", 334, 11)
+                                })
+                            ],
+                            rhs: vec![
+                                ExprNode::Literal(LiteralNode::Int(3)),
+                                ExprNode::Literal(LiteralNode::Int(2)),
+                            ]
+                        })
+                    ]))
                 })))
             })],
             parse(
@@ -105,6 +128,8 @@ mod tests {
                             k := 3;
                         } else {
                             {};
+                            m--;
+                            k, r &^= 3, 2;
                         };
                     }
                 ",

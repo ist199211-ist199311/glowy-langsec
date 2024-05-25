@@ -53,8 +53,13 @@ fn resume_parsing_assignment_lhs<'a>(
 }
 
 // statements that start with an expression and then diverge wrt operator
-fn parse_expression_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, StatementNode<'a>> {
-    let lhs = parse_expression(s)?;
+fn parse_expression_first_stmt<'a>(
+    s: &mut TokenStream<'a>,
+    starting_from: Option<ExprNode<'a>>,
+) -> PResult<'a, StatementNode<'a>> {
+    let lhs = starting_from
+        .map(Ok)
+        .unwrap_or_else(|| parse_expression(s))?;
 
     // this needs to be separate so we don't consume the semicolon,
     // and to avoid using peek on the match (would require .next in every branch)
@@ -131,11 +136,20 @@ fn parse_assignment_or_short_var_decl<'a>(
                     .map(|id| ExprNode::Name(OperandNameNode { package: None, id }))
                     .collect::<Vec<_>>();
 
-                // FIXME: this is somewhat wrong! there must be a way to
-                // defer to `parse_expression_first_stmt`, otherwise
-                // expressions such as `m` or `m--` are not accepted as stmts!
+                if !was_comma && exprs.len() == 1 {
+                    // actually there's still a change it's not an assignment,
+                    // so we need to check the other possibilities
 
-                return resume_parsing_assignment_lhs(s, exprs);
+                    // FIXME: this does not work for expressions that start with
+                    // an identifier, like a.b or a[b], since "a" will be turned
+                    // into an operand (not qualified) and the next routine will
+                    // error for unexpected . or [ in expression
+
+                    return parse_expression_first_stmt(s, exprs.into_iter().next());
+                } else {
+                    // we've passed a comma so it HAS to be an assignment
+                    return resume_parsing_assignment_lhs(s, exprs);
+                }
             }
         }
     }
@@ -163,7 +177,7 @@ fn parse_statement<'a>(
         }
         Some(of_kind!(TokenKind::If)) if allow_non_simple => parse_if_statement(s)?.into(),
         Some(of_kind!(TokenKind::Ident)) => parse_assignment_or_short_var_decl(s)?,
-        _ => parse_expression_first_stmt(s)?,
+        _ => parse_expression_first_stmt(s, None)?,
     };
 
     Ok(node)
