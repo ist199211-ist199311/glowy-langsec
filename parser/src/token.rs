@@ -74,14 +74,19 @@ pub enum TokenKind {
 pub struct Token<'a> {
     pub kind: TokenKind,
     pub span: Span<'a>,
+    pub annotation: Option<Box<Annotation>>, // box to prevent bloating size
 }
 
 impl<'a> Token<'a> {
     pub fn new(kind: TokenKind, span: Span<'a>) -> Self {
-        Self { kind, span }
+        Self {
+            kind,
+            span,
+            annotation: None,
+        }
     }
 
-    pub fn from_identifier_or_keyword(span: Span<'a>) -> Self {
+    pub fn from_identifier_or_keyword(span: Span<'a>, annotation: Option<Annotation>) -> Self {
         let kind = match span.content {
             "const" => TokenKind::Const,
             "else" => TokenKind::Else,
@@ -92,6 +97,16 @@ impl<'a> Token<'a> {
             _ => TokenKind::Ident,
         };
 
-        Self { kind, span }
+        Self {
+            kind,
+            span,
+            annotation: annotation.map(Box::new),
+        }
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Annotation {
+    pub scope: String,
+    pub labels: Vec<String>,
 }

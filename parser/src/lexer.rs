@@ -1,10 +1,11 @@
 use std::{num::ParseIntError, str::Chars};
 
 use finl_unicode::categories::CharacterCategories;
+use regex::Regex;
 
 use crate::{
     errors::{Diagnostics, ErrorDiagnosticInfo},
-    token::{Token, TokenKind},
+    token::{Annotation, Token, TokenKind},
     Span,
 };
 
@@ -58,6 +59,9 @@ pub struct Lexer<'a> {
 
     offset: usize, // 0-indexed, from start of src (*not* start of line)
     line: usize,   // 1-indexed
+
+    annotation_regex: Regex, // prevent constant recompilation (slow)
+    last_annotation: Option<Annotation>, // prevent clearing by whitespace
 }
 
 type LResult<'a> = Result<Token<'a>, LexingError<'a>>;
@@ -69,6 +73,10 @@ impl<'a> Lexer<'a> {
 
             offset: 0,
             line: 1,
+
+            annotation_regex: Regex::new(r#"glowy::(?P<scope>\w+)::\{(?P<labels>[^}]*)\}"#)
+                .unwrap(),
+            last_annotation: None,
         }
     }
 
@@ -156,7 +164,19 @@ impl<'a> Lexer<'a> {
                     // line comment
 
                     self.read_n::<2>(); // step over //
-                    self.read_while(|ch| ch != '\n');
+                    let text = self.read_while(|ch| ch != '\n').content;
+
+                    if let Some(captures) = self.annotation_regex.captures(text) {
+                        let scope = captures["scope"].to_owned();
+                        let labels = captures["labels"]
+                            .split(',')
+                            .map(str::trim)
+                            .filter(|label| !label.is_empty())
+                            .map(str::to_owned)
+                            .collect();
+
+                        self.last_annotation = Some(Annotation { scope, labels });
+                    }
                 }
                 Some('*') => {
                     // general comment
@@ -178,7 +198,7 @@ impl<'a> Lexer<'a> {
     fn identifier_or_keyword(&mut self) -> Token<'a> {
         let ident = self.read_while(|ch| is_letter(ch) || is_unicode_digit(ch));
 
-        Token::from_identifier_or_keyword(ident)
+        Token::from_identifier_or_keyword(ident, self.last_annotation.take())
     }
 
     fn number_literal(&mut self) -> LResult<'a> {
@@ -442,6 +462,8 @@ impl<'a> Iterator for Lexer<'a> {
             None => return None,
         };
 
+        self.last_annotation.take(); // clear
+
         Some(Ok(token))
     }
 }
@@ -473,14 +495,8 @@ mod tests {
     fn package() {
         assert_eq!(
             vec![
-                Token {
-                    span: Span::new("package", 2, 1),
-                    kind: TokenKind::Package,
-                },
-                Token {
-                    span: Span::new("hello", 16, 3),
-                    kind: TokenKind::Ident,
-                }
+                Token::new(TokenKind::Package, Span::new("package", 2, 1)),
+                Token::new(TokenKind::Ident, Span::new("hello", 16, 3))
             ],
             lex("  package    \t\n\nhello").unwrap(),
         )
@@ -490,34 +506,13 @@ mod tests {
     fn int_lits() {
         assert_eq!(
             vec![
-                Token {
-                    kind: TokenKind::Int(3),
-                    span: Span::new("3", 2, 1)
-                },
-                Token {
-                    kind: TokenKind::Int(50),
-                    span: Span::new("50", 4, 1)
-                },
-                Token {
-                    kind: TokenKind::Int(29),
-                    span: Span::new("0b11101", 7, 1)
-                },
-                Token {
-                    kind: TokenKind::Int(505),
-                    span: Span::new("0o771", 15, 1)
-                },
-                Token {
-                    kind: TokenKind::Int(3909),
-                    span: Span::new("0xf45", 21, 1)
-                },
-                Token {
-                    kind: TokenKind::Int(123),
-                    span: Span::new("0123", 28, 2)
-                },
-                Token {
-                    kind: TokenKind::Int(0),
-                    span: Span::new("0", 33, 2)
-                }
+                Token::new(TokenKind::Int(3), Span::new("3", 2, 1)),
+                Token::new(TokenKind::Int(50), Span::new("50", 4, 1)),
+                Token::new(TokenKind::Int(29), Span::new("0b11101", 7, 1)),
+                Token::new(TokenKind::Int(505), Span::new("0o771", 15, 1)),
+                Token::new(TokenKind::Int(3909), Span::new("0xf45", 21, 1)),
+                Token::new(TokenKind::Int(123), Span::new("0123", 28, 2)),
+                Token::new(TokenKind::Int(0), Span::new("0", 33, 2))
             ],
             lex("\t 3 50 0b11101 0o771 0xf45\n 0123 0").unwrap()
         )
@@ -527,42 +522,15 @@ mod tests {
     fn greedy() {
         assert_eq!(
             vec![
-                Token {
-                    kind: TokenKind::Gt,
-                    span: Span::new(">", 0, 1)
-                },
-                Token {
-                    kind: TokenKind::Excl,
-                    span: Span::new("!", 2, 1)
-                },
-                Token {
-                    kind: TokenKind::DoubleEq,
-                    span: Span::new("==", 4, 1)
-                },
-                Token {
-                    kind: TokenKind::NotEq,
-                    span: Span::new("!=", 7, 1)
-                },
-                Token {
-                    kind: TokenKind::AmpCaret,
-                    span: Span::new("&^", 10, 1)
-                },
-                Token {
-                    kind: TokenKind::AmpCaretAssign,
-                    span: Span::new("&^=", 13, 1)
-                },
-                Token {
-                    kind: TokenKind::Comma,
-                    span: Span::new(",", 17, 1)
-                },
-                Token {
-                    kind: TokenKind::DoubleGt,
-                    span: Span::new(">>", 19, 1)
-                },
-                Token {
-                    kind: TokenKind::Gt,
-                    span: Span::new(">", 21, 1)
-                }
+                Token::new(TokenKind::Gt, Span::new(">", 0, 1)),
+                Token::new(TokenKind::Excl, Span::new("!", 2, 1)),
+                Token::new(TokenKind::DoubleEq, Span::new("==", 4, 1)),
+                Token::new(TokenKind::NotEq, Span::new("!=", 7, 1)),
+                Token::new(TokenKind::AmpCaret, Span::new("&^", 10, 1)),
+                Token::new(TokenKind::AmpCaretAssign, Span::new("&^=", 13, 1)),
+                Token::new(TokenKind::Comma, Span::new(",", 17, 1)),
+                Token::new(TokenKind::DoubleGt, Span::new(">>", 19, 1)),
+                Token::new(TokenKind::Gt, Span::new(">", 21, 1))
             ],
             lex("> ! == != &^ &^= , >>>").unwrap()
         )

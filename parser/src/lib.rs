@@ -3,6 +3,7 @@ use std::{iter::Peekable, ops::Range};
 use ast::SourceFileNode;
 pub use errors::{Diagnostics, ErrorDiagnosticInfo, ParsingError};
 use lexer::Lexer;
+pub use token::Annotation;
 
 use crate::parser::parse_source_file;
 

@@ -10,3 +10,4 @@ license.workspace = true
 [dependencies]
 codespan-reporting.workspace = true
 finl_unicode = "1.2.0"
+regex = "1.10.4"

@@ -1,7 +1,7 @@
 use crate::{
     ast::{BindingDeclSpecNode, DeclNode},
     parser::{expect, exprs::parse_expression, of_kind, types::parse_type, PResult},
-    token::{Token, TokenKind},
+    token::{Annotation, Token, TokenKind},
     ParsingError, TokenStream,
 };
 
@@ -42,10 +42,14 @@ impl BindingKind {
         }
     }
 
-    fn build_node<'a>(&self, specs: Vec<BindingDeclSpecNode<'a>>) -> DeclNode<'a> {
+    fn build_node<'a>(
+        &self,
+        specs: Vec<BindingDeclSpecNode<'a>>,
+        annotation: Option<Box<Annotation>>,
+    ) -> DeclNode<'a> {
         match self {
-            Self::Const => DeclNode::Const(specs),
-            Self::Var => DeclNode::Var(specs),
+            Self::Const => DeclNode::Const { specs, annotation },
+            Self::Var => DeclNode::Var { specs, annotation },
         }
     }
 }
@@ -128,7 +132,7 @@ fn parse_specs_list<'a>(
 }
 
 fn parse_binding_decl<'a>(s: &mut TokenStream<'a>, kind: BindingKind) -> PResult<'a, DeclNode<'a>> {
-    expect(s, kind.keyword(), Some(kind.decl_context()))?;
+    let token = expect(s, kind.keyword(), Some(kind.decl_context()))?;
 
     let specs = match s.peek().cloned().transpose()? {
         Some(of_kind!(TokenKind::Ident)) => vec![parse_spec(s, &kind)?],
@@ -141,7 +145,7 @@ fn parse_binding_decl<'a>(s: &mut TokenStream<'a>, kind: BindingKind) -> PResult
         }
     };
 
-    Ok(kind.build_node(specs))
+    Ok(kind.build_node(specs, token.annotation))
 }
 
 pub fn parse_const_decl<'a>(s: &mut TokenStream<'a>) -> PResult<'a, DeclNode<'a>> {

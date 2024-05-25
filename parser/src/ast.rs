@@ -1,4 +1,4 @@
-use crate::Span;
+use crate::{Annotation, Span};
 
 #[derive(Debug, PartialEq)]
 pub struct SourceFileNode<'a> {
@@ -14,8 +14,14 @@ pub struct PackageClauseNode<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum DeclNode<'a> {
-    Const(Vec<BindingDeclSpecNode<'a>>),
-    Var(Vec<BindingDeclSpecNode<'a>>),
+    Const {
+        specs: Vec<BindingDeclSpecNode<'a>>,
+        annotation: Option<Box<Annotation>>,
+    },
+    Var {
+        specs: Vec<BindingDeclSpecNode<'a>>,
+        annotation: Option<Box<Annotation>>,
+    },
     Function(FunctionDeclNode<'a>),
 }
 
