@@ -216,6 +216,7 @@ pub enum StatementNode<'a> {
     Decl(DeclNode<'a>),
     If(IfNode<'a>),
     Block(BlockNode<'a>),
+    Return(Vec<ExprNode<'a>>),
 }
 
 impl<'a> From<ExprNode<'a>> for StatementNode<'a> {

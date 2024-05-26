@@ -67,6 +67,7 @@ pub enum TokenKind {
     Func,
     If,
     Package,
+    Return,
     Var,
 }
 
@@ -93,6 +94,7 @@ impl<'a> Token<'a> {
             "func" => TokenKind::Func,
             "if" => TokenKind::If,
             "package" => TokenKind::Package,
+            "return" => TokenKind::Return,
             "var" => TokenKind::Var,
             _ => TokenKind::Ident,
         };

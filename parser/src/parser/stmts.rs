@@ -1,4 +1,4 @@
-use self::flow::parse_if_statement;
+use self::flow::{parse_if_statement, parse_return_statement};
 use super::{
     decls::bindings::{parse_const_decl, parse_var_decl},
     expect,
@@ -154,6 +154,7 @@ fn parse_statement<'a>(
             StatementNode::Block(parse_block(s)?)
         }
         Some(of_kind!(TokenKind::If)) if allow_non_simple => parse_if_statement(s)?.into(),
+        Some(of_kind!(TokenKind::Return)) if allow_non_simple => parse_return_statement(s)?,
 
         // declarations (sadly cannot be abstracted, indistinguishable if not for keywords)
         Some(of_kind!(TokenKind::Const)) => parse_const_decl(s)?.into(),
