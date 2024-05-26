@@ -12,7 +12,6 @@ use crate::{
 #[derive(Clone, Debug)]
 pub enum LexingError<'a> {
     UnknownChar(Span<'a>),
-    InvalidNumberLiteralMode(Span<'a>),
     InvalidNumberLiteralChar(Span<'a>),
     IntParseFailure(Span<'a>, ParseIntError),
 }
@@ -32,20 +31,14 @@ impl<'a> Diagnostics<'a> for LexingError<'a> {
                 details: s!("this character is invalid in Go or unsupported"),
                 context: Some(context.clone()),
             },
-            Self::InvalidNumberLiteralMode(context) => ErrorDiagnosticInfo {
-                code: s!("L002"),
-                overview: s!("failed to process unknown number literal mode"),
-                details: s!("this kind of literal is not supported (use 'b', 'o', or 'x')"),
-                context: Some(context.clone()),
-            },
             Self::InvalidNumberLiteralChar(context) => ErrorDiagnosticInfo {
-                code: s!("L003"),
+                code: s!("L002"),
                 overview: s!("failed to process unknown number literal character"),
                 details: s!("this character is not valid for the given literal mode"),
                 context: Some(context.clone()),
             },
             Self::IntParseFailure(context, err) => ErrorDiagnosticInfo {
-                code: s!("L004"),
+                code: s!("L003"),
                 overview: s!("failed to parse integer literal"),
                 details: err.to_string(),
                 context: Some(context.clone()),
@@ -240,11 +233,7 @@ impl<'a> Lexer<'a> {
                             'b' => NumberLexMode::Binary,
                             'o' => NumberLexMode::Octal,
                             'x' => NumberLexMode::Hex,
-                            _ => {
-                                let span = lexer.read_span().unwrap();
-                                state.err = Some(LexingError::InvalidNumberLiteralMode(span));
-                                return false;
-                            }
+                            _ => return false, // this is probably another token
                         }
                     }
                     NumberLexMode::Binary if ch == '0' || ch == '1' => state.read = true,

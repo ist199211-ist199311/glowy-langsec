@@ -103,6 +103,7 @@ pub struct FunctionParamDeclNode<'a> {
 pub enum ExprNode<'a> {
     Name(OperandNameNode<'a>),
     Literal(LiteralNode),
+    Call(CallNode<'a>),
     // TODO: more primary expressions...
     UnaryOp {
         kind: UnaryOpKind,
@@ -161,6 +162,12 @@ impl From<LiteralNode> for ExprNode<'_> {
     }
 }
 
+impl<'a> From<CallNode<'a>> for ExprNode<'a> {
+    fn from(node: CallNode<'a>) -> Self {
+        Self::Call(node)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct OperandNameNode<'a> {
     pub package: Option<Span<'a>>, // for qualified operand names
@@ -170,6 +177,13 @@ pub struct OperandNameNode<'a> {
 #[derive(Debug, PartialEq)]
 pub enum LiteralNode {
     Int(u64),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CallNode<'a> {
+    pub func: Box<ExprNode<'a>>,
+    pub args: Vec<ExprNode<'a>>,
+    pub variadic: bool, // whether the last argument is "x..."
 }
 
 pub type BlockNode<'a> = Vec<StatementNode<'a>>;

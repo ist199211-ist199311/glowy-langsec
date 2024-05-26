@@ -2,7 +2,7 @@ use self::flow::parse_if_statement;
 use super::{
     decls::bindings::{parse_const_decl, parse_var_decl},
     expect,
-    exprs::{parse_expression, parse_expressions_list, parse_expressions_list_bool},
+    exprs::{parse_expression, parse_expressions_list, parse_expressions_list_while},
     PResult,
 };
 use crate::{
@@ -23,7 +23,7 @@ fn resume_parsing_assignment_rhs<'a>(
     lhs: Vec<ExprNode<'a>>,
     kind: AssignmentKind,
 ) -> PResult<'a, StatementNode<'a>> {
-    if let Some(rhs) = parse_expressions_list_bool(s, |t| t.kind == TokenKind::SemiColon)? {
+    if let Some(rhs) = parse_expressions_list_while(s, |t| t.kind != TokenKind::SemiColon)? {
         Ok(StatementNode::Assignment(AssignmentNode { kind, lhs, rhs }))
     } else {
         // reached end-of-file...
@@ -134,7 +134,7 @@ fn parse_identifier_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
     b.next(); // step over operator that caused break
     context.commit()?; // we're sure it's a short var decl so we can go back to the main stream now
 
-    if let Some(exprs) = parse_expressions_list_bool(s, |t| t.kind == TokenKind::SemiColon)? {
+    if let Some(exprs) = parse_expressions_list_while(s, |t| t.kind != TokenKind::SemiColon)? {
         Ok(StatementNode::ShortVarDecl(ShortVarDeclNode { ids, exprs }))
     } else {
         // reached end-of-file...

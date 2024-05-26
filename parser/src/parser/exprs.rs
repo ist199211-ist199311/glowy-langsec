@@ -1,3 +1,4 @@
+use self::postfix::parse_postfix_if_exists;
 use super::{expect, PResult};
 use crate::{
     ast::{ExprNode, LiteralNode, OperandNameNode},
@@ -7,6 +8,7 @@ use crate::{
 };
 
 mod ops;
+mod postfix;
 
 fn parse_operand_name<'a>(s: &mut TokenStream<'a>) -> PResult<'a, OperandNameNode<'a>> {
     let token = expect(s, TokenKind::Ident, Some("operand name"))?;
@@ -27,23 +29,29 @@ fn parse_operand_name<'a>(s: &mut TokenStream<'a>) -> PResult<'a, OperandNameNod
 }
 
 pub fn parse_primary_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
-    match s.peek().cloned().transpose()? {
-        Some(of_kind!(TokenKind::Ident)) => Ok(parse_operand_name(s)?.into()),
+    let expr = match s.peek().cloned().transpose()? {
+        Some(of_kind!(TokenKind::Ident)) => parse_operand_name(s)?.into(),
         Some(of_kind!(TokenKind::Int(v))) => {
             s.next(); // advance
-            Ok(LiteralNode::Int(v).into())
+
+            LiteralNode::Int(v).into()
         }
         Some(of_kind!(TokenKind::ParenL)) => {
             s.next(); // advance
             let inner = parse_expression(s)?;
             expect(s, TokenKind::ParenR, Some("parenthesized expression"))?;
-            Ok(inner)
+
+            inner
         }
-        found => Err(ParsingError::UnexpectedConstruct {
-            expected: "a primary expression",
-            found,
-        }),
-    }
+        found => {
+            return Err(ParsingError::UnexpectedConstruct {
+                expected: "a primary expression",
+                found,
+            })
+        }
+    };
+
+    parse_postfix_if_exists(s, expr)
 }
 
 pub fn parse_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
@@ -87,16 +95,15 @@ where
     Ok(None)
 }
 
-// TODO: rename this to something better...
-pub fn parse_expressions_list_bool<'a, F>(
+pub fn parse_expressions_list_while<'a, F>(
     s: &mut TokenStream<'a>,
-    stop_cond: F,
+    cond: F,
 ) -> PResult<'a, Option<Vec<ExprNode<'a>>>>
 where
     F: Fn(Token<'a>) -> bool,
 {
     Ok(
-        parse_expressions_list(s, |token| stop_cond(token).then_some(()).ok_or(()))?
+        parse_expressions_list(s, |token| (!cond(token)).then_some(()).ok_or(()))?
             .map(|(exprs, _)| exprs),
     )
 }
