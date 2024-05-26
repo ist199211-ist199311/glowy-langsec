@@ -71,6 +71,22 @@ pub enum TokenKind {
     Var,
 }
 
+impl TokenKind {
+    pub fn allows_implicit_semicolon(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::Ident
+                | TokenKind::Int(_)
+                | TokenKind::Return
+                | TokenKind::PlusPlus
+                | TokenKind::MinusMinus
+                | TokenKind::ParenR
+                | TokenKind::SquareR
+                | TokenKind::CurlyR
+        )
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,

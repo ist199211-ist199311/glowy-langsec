@@ -1,4 +1,4 @@
-use std::{num::ParseIntError, str::Chars};
+use std::{collections::VecDeque, num::ParseIntError, str::Chars};
 
 use finl_unicode::categories::CharacterCategories;
 use regex::Regex;
@@ -54,6 +54,9 @@ pub struct Lexer<'a> {
     offset: usize, // 0-indexed, from start of src (*not* start of line)
     line: usize,   // 1-indexed
 
+    last_token_kind: Option<TokenKind>,
+    queue: VecDeque<Token<'a>>,
+
     annotation_regex: Regex, // prevent constant recompilation (slow)
     last_annotation: Option<Annotation<'a>>, // prevent clearing by whitespace
 }
@@ -68,6 +71,9 @@ impl<'a> Lexer<'a> {
             offset: 0,
             line: 1,
 
+            last_token_kind: None,
+            queue: VecDeque::new(),
+
             annotation_regex: Regex::new(r#"glowy::(?P<scope>\w+)::\{(?P<labels>[^}]*)\}"#)
                 .unwrap(),
             last_annotation: None,
@@ -80,11 +86,25 @@ impl<'a> Lexer<'a> {
     }
 
     fn read_char(&mut self) -> Option<char> {
+        let view = self.src.as_str();
+        let (original_offset, original_line) = (self.offset, self.line);
+
         if let Some(ch) = self.src.next() {
             self.offset += ch.len_utf8();
 
             if ch == '\n' {
                 self.line += 1;
+
+                if self
+                    .last_token_kind
+                    .as_ref()
+                    .map(TokenKind::allows_implicit_semicolon)
+                    .unwrap_or(false)
+                {
+                    // newline is guaranteed single-byte, no panic
+                    let span = Span::new(&view[..1], original_offset, original_line);
+                    self.queue.push_back(Token::new(TokenKind::SemiColon, span));
+                }
             }
 
             Some(ch)
@@ -355,6 +375,11 @@ impl<'a> Iterator for Lexer<'a> {
             };
         }
 
+        if let Some(queued) = self.queue.pop_front() {
+            self.last_token_kind = Some(queued.kind.clone());
+            return Some(Ok(queued));
+        }
+
         self.skip_comments();
 
         let token = match self.peek_char() {
@@ -454,7 +479,10 @@ impl<'a> Iterator for Lexer<'a> {
 
             // TODO: support floats starting with dot (e.g., `.3`)
             // (this is not trivial since it conflicts with TokenKind::Period)
-            Some(ch) if ch.is_ascii_digit() => return Some(self.number_literal()),
+            Some(ch) if ch.is_ascii_digit() => match self.number_literal() {
+                Ok(token) => token,
+                err @ Err(_) => return Some(err),
+            },
 
             Some(ch) if is_letter(ch) => self.identifier_or_keyword(),
             Some(ch) if is_whitespace(ch) => {
@@ -464,6 +492,8 @@ impl<'a> Iterator for Lexer<'a> {
             Some(_) => return Some(Err(LexingError::UnknownChar(self.read_span().unwrap()))),
             None => return None,
         };
+
+        self.last_token_kind = Some(token.kind.clone());
 
         Some(Ok(token))
     }
@@ -512,6 +542,7 @@ mod tests {
                 Token::new(TokenKind::Int(29), Span::new("0b11101", 7, 1)),
                 Token::new(TokenKind::Int(505), Span::new("0o771", 15, 1)),
                 Token::new(TokenKind::Int(3909), Span::new("0xf45", 21, 1)),
+                Token::new(TokenKind::SemiColon, Span::new("\n", 26, 1)),
                 Token::new(TokenKind::Int(123), Span::new("0123", 28, 2)),
                 Token::new(TokenKind::Int(0), Span::new("0", 33, 2))
             ],
