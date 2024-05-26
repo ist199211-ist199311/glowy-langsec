@@ -7,10 +7,10 @@ use super::{
 };
 use crate::{
     ast::{
-        AssignmentKind, AssignmentNode, BlockNode, ExprNode, OperandNameNode, SendNode,
-        ShortVarDeclNode, StatementNode,
+        AssignmentKind, AssignmentNode, BlockNode, ExprNode, SendNode, ShortVarDeclNode,
+        StatementNode,
     },
-    parser::of_kind,
+    parser::{of_kind, BacktrackingContext},
     token::{Token, TokenKind},
     ParsingError, TokenStream,
 };
@@ -54,13 +54,8 @@ fn resume_parsing_assignment_lhs<'a>(
 }
 
 // statements that start with an expression and then diverge wrt operator
-fn parse_expression_first_stmt<'a>(
-    s: &mut TokenStream<'a>,
-    starting_from: Option<ExprNode<'a>>,
-) -> PResult<'a, StatementNode<'a>> {
-    let lhs = starting_from
-        .map(Ok)
-        .unwrap_or_else(|| parse_expression(s))?;
+fn parse_expression_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, StatementNode<'a>> {
+    let lhs = parse_expression(s)?;
 
     // this needs to be separate so we don't consume the semicolon,
     // and to avoid using peek on the match (would require .next in every branch)
@@ -94,10 +89,11 @@ fn parse_expression_first_stmt<'a>(
     Ok(node)
 }
 
-fn parse_assignment_or_short_var_decl<'a>(
-    s: &mut TokenStream<'a>,
-) -> PResult<'a, StatementNode<'a>> {
-    let first = expect(s, TokenKind::Ident, Some("statement"))?;
+fn parse_identifier_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, StatementNode<'a>> {
+    let mut context = BacktrackingContext::new(s);
+    let b = context.stream();
+
+    let first = expect(b, TokenKind::Ident, Some("statement"))?;
 
     // assume it's a short var decl and that we're collecting ids (vs expressions)
     let mut ids = vec![first.span];
@@ -105,14 +101,14 @@ fn parse_assignment_or_short_var_decl<'a>(
     let mut was_comma = false; // whether the last token was a comma
 
     loop {
-        match s.peek().cloned().transpose()? {
+        match b.peek().cloned().transpose()? {
             Some(of_kind!(TokenKind::Ident)) if was_comma => {
                 if was_comma {
-                    ids.push(s.next().unwrap()?.span);
+                    ids.push(b.next().unwrap()?.span);
                     was_comma = false;
                 } else {
                     // 2 identifiers in a row
-                    expect(s, TokenKind::Comma, Some("statement"))?;
+                    expect(b, TokenKind::Comma, Some("statement"))?;
                     // ^^ this will error
                 }
             }
@@ -124,38 +120,19 @@ fn parse_assignment_or_short_var_decl<'a>(
                         found,
                     });
                 } else {
-                    s.next(); // advance
+                    b.next(); // advance
                     was_comma = true;
                 }
             }
             Some(of_kind!(TokenKind::ColonAssign)) if !was_comma => break, // short var decl!
-            _ => {
-                // we got it wrong... it's an assignment;
-                // convert the identifiers we had into expressions and carry on
-                let exprs = ids
-                    .into_iter()
-                    .map(|id| ExprNode::Name(OperandNameNode { package: None, id }))
-                    .collect::<Vec<_>>();
 
-                if !was_comma && exprs.len() == 1 {
-                    // actually there's still a change it's not an assignment,
-                    // so we need to check the other possibilities
-
-                    // FIXME: this does not work for expressions that start with
-                    // an identifier, like a.b or a[b], since "a" will be turned
-                    // into an operand (not qualified) and the next routine will
-                    // error for unexpected . or [ in expression
-
-                    return parse_expression_first_stmt(s, exprs.into_iter().next());
-                } else {
-                    // we've passed a comma so it HAS to be an assignment
-                    return resume_parsing_assignment_lhs(s, exprs);
-                }
-            }
+            // we got it wrong... they're expressions
+            _ => return parse_expression_first_stmt(s), // backtrack
         }
     }
 
-    s.next(); // step over operator that caused break
+    b.next(); // step over operator that caused break
+    context.commit()?; // we're sure it's a short var decl so we can go back to the main stream now
 
     if let Some(exprs) = parse_expressions_list_bool(s, |t| t.kind == TokenKind::SemiColon)? {
         Ok(StatementNode::ShortVarDecl(ShortVarDeclNode { ids, exprs }))
@@ -182,8 +159,8 @@ fn parse_statement<'a>(
         Some(of_kind!(TokenKind::Const)) => parse_const_decl(s)?.into(),
         Some(of_kind!(TokenKind::Var)) => parse_var_decl(s)?.into(),
 
-        Some(of_kind!(TokenKind::Ident)) => parse_assignment_or_short_var_decl(s)?,
-        _ => parse_expression_first_stmt(s, None)?,
+        Some(of_kind!(TokenKind::Ident)) => parse_identifier_first_stmt(s)?,
+        _ => parse_expression_first_stmt(s)?,
     };
 
     Ok(node)
@@ -234,7 +211,7 @@ impl TryFrom<TokenKind> for AssignmentKind {
 mod tests {
     use super::*;
     use crate::{
-        ast::{BinaryOpKind, LiteralNode, UnaryOpKind},
+        ast::{BinaryOpKind, LiteralNode, OperandNameNode, UnaryOpKind},
         lexer::Lexer,
         Span,
     };

@@ -74,3 +74,47 @@ pub fn parse_source_file<'a>(s: &mut TokenStream<'a>) -> PResult<'a, SourceFileN
         top_level_decls,
     })
 }
+
+// utility to allow non-committal peeking deep within a token stream
+pub struct BacktrackingContext<'l, 'a> {
+    // rust enforces that invoker can't use original while we hold it here
+    // until the last time the context is used, since otherwise there would
+    // be 2 mutable references at once
+    original: &'l mut TokenStream<'a>,
+    clone: TokenStream<'a>,
+}
+
+impl<'l, 'a> BacktrackingContext<'l, 'a> {
+    pub fn new(original: &'l mut TokenStream<'a>) -> Self {
+        let clone = original.clone();
+
+        Self { original, clone }
+    }
+
+    pub fn stream(&mut self) -> &mut TokenStream<'a> {
+        &mut self.clone
+    }
+
+    pub fn commit(&mut self) -> PResult<'a, ()> {
+        fn offset<'a>(s: &mut TokenStream<'a>) -> PResult<'a, Option<usize>> {
+            Ok(s.peek()
+                .cloned()
+                .transpose()?
+                .map(|token| token.span.offset))
+        }
+
+        if let Some(target) = offset(&mut self.clone)? {
+            while let Some(current) = offset(self.original)? {
+                if current == target {
+                    break;
+                }
+                self.original.next();
+            }
+        } else {
+            // clone was consumed until end-of-file
+            self.original.last();
+        }
+
+        Ok(())
+    }
+}

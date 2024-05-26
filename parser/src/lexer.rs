@@ -54,6 +54,7 @@ impl<'a> Diagnostics<'a> for LexingError<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct Lexer<'a> {
     src: Chars<'a>, // cannot use Peekable<Chars> as it doesn't support .as_str()
 

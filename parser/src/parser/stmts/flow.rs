@@ -106,8 +106,8 @@ mod tests {
                                     id: Span::new("k", 331, 11)
                                 }),
                                 ExprNode::Name(OperandNameNode {
-                                    package: None,
-                                    id: Span::new("r", 334, 11)
+                                    package: Some(Span::new("m", 334, 11)),
+                                    id: Span::new("r", 336, 11)
                                 })
                             ],
                             rhs: vec![
@@ -129,7 +129,7 @@ mod tests {
                         } else {
                             {};
                             m--;
-                            k, r &^= 3, 2;
+                            k, m.r &^= 3, 2;
                         };
                     }
                 ",
