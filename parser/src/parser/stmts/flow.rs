@@ -4,7 +4,7 @@ use crate::{
         expect,
         exprs::{parse_expression, parse_expressions_list_while},
         of_kind,
-        stmts::parse_block,
+        stmts::{parse_block, terminal_token},
         PResult,
     },
     token::{Token, TokenKind},
@@ -43,7 +43,7 @@ pub fn parse_if_statement<'a>(s: &mut TokenStream<'a>) -> PResult<'a, IfNode<'a>
 pub fn parse_return_statement<'a>(s: &mut TokenStream<'a>) -> PResult<'a, StatementNode<'a>> {
     expect(s, TokenKind::Return, Some("return statement"))?;
 
-    let exprs = parse_expressions_list_while(s, |token| token.kind != TokenKind::SemiColon)?
+    let exprs = parse_expressions_list_while(s, |token| !terminal_token(&token.kind))?
         .unwrap_or_else(Vec::new); // a potentially better error will be thrown higher up the chain
 
     Ok(StatementNode::Return(exprs))

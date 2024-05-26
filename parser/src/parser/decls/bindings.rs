@@ -115,6 +115,12 @@ fn parse_specs_list<'a>(
             Some(of_kind!(TokenKind::ParenR)) => break,
             Some(of_kind!(TokenKind::Ident)) => {
                 specs.push(parse_spec(s, kind)?);
+
+                // spec allows omitting semicolon before closing (
+                if let Some(Ok(of_kind!(TokenKind::ParenR))) = s.peek() {
+                    break;
+                }
+
                 expect(s, TokenKind::SemiColon, Some(kind.spec_context()))?;
             }
             found => {
