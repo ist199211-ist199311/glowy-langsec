@@ -87,7 +87,10 @@ impl<'a> Token<'a> {
         }
     }
 
-    pub fn from_identifier_or_keyword(span: Span<'a>, annotation: Option<Annotation<'a>>) -> Self {
+    pub fn from_identifier_or_keyword(
+        span: Span<'a>,
+        annotation: &mut Option<Annotation<'a>>,
+    ) -> Self {
         let kind = match span.content {
             "const" => TokenKind::Const,
             "else" => TokenKind::Else,
@@ -99,10 +102,16 @@ impl<'a> Token<'a> {
             _ => TokenKind::Ident,
         };
 
+        let annotation = if kind != TokenKind::Ident {
+            annotation.take().map(Box::new)
+        } else {
+            None
+        };
+
         Self {
             kind,
             span,
-            annotation: annotation.map(Box::new),
+            annotation,
         }
     }
 }

@@ -191,6 +191,7 @@ pub struct CallNode<'a> {
     pub func: Box<ExprNode<'a>>,
     pub args: Vec<ExprNode<'a>>,
     pub variadic: bool, // whether the last argument is "x..."
+    pub annotation: Option<Box<Annotation<'a>>>,
 }
 
 #[derive(Debug, PartialEq)]

@@ -7,7 +7,7 @@ use crate::{
 };
 
 pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a, CallNode<'a>> {
-    expect(s, TokenKind::ParenL, Some("function call"))?;
+    let annotation = expect(s, TokenKind::ParenL, Some("function call"))?.annotation;
 
     // TODO: support trailing comma
 
@@ -30,6 +30,7 @@ pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a
         func: Box::new(func),
         args,
         variadic,
+        annotation,
     })
 }
 
@@ -111,10 +112,12 @@ mod tests {
                         },
                         ExprNode::Literal(LiteralNode::Int(0))
                     ],
-                    variadic: true
+                    variadic: true,
+                    annotation: None,
                 })),
                 args: vec![],
-                variadic: false
+                variadic: false,
+                annotation: None
             }),
             parse("(abc.def + 14)(21 + 7 * -9, 0...)()").unwrap()
         )
@@ -143,7 +146,8 @@ mod tests {
                     }),
                 })),
                 args: vec![],
-                variadic: false
+                variadic: false,
+                annotation: None
             }),
             parse("(abc.def + 14)[k + 2,]()").unwrap()
         )

@@ -191,7 +191,7 @@ impl<'a> Lexer<'a> {
     fn identifier_or_keyword(&mut self) -> Token<'a> {
         let ident = self.read_while(|ch| is_letter(ch) || is_unicode_digit(ch));
 
-        Token::from_identifier_or_keyword(ident, self.last_annotation.take())
+        Token::from_identifier_or_keyword(ident, &mut self.last_annotation)
     }
 
     fn number_literal(&mut self) -> LResult<'a> {
@@ -358,9 +358,7 @@ impl<'a> Iterator for Lexer<'a> {
         self.skip_comments();
 
         let token = match self.peek_char() {
-            Some(';') => single_char_token!(TokenKind::SemiColon),
             Some(',') => single_char_token!(TokenKind::Comma),
-            Some('(') => single_char_token!(TokenKind::ParenL),
             Some(')') => single_char_token!(TokenKind::ParenR),
             Some('[') => single_char_token!(TokenKind::SquareL),
             Some(']') => single_char_token!(TokenKind::SquareR),
@@ -438,6 +436,22 @@ impl<'a> Iterator for Lexer<'a> {
                 ]
             )),
 
+            // FIXME: find a more sane way to pass annotation to function call
+            // without using the open parenthesis token; if that happens,
+            // ; can go back to being single_char_token and we can clear
+            // last annotation after every token (right before returning).
+            // identifier_or_keyword could also go back to calling take
+            // directly instead of passing a mutable reference
+            Some(';') => {
+                self.last_annotation.take(); // clear
+                single_char_token!(TokenKind::SemiColon)
+            }
+            Some('(') => Token {
+                kind: TokenKind::ParenL,
+                span: self.read_span().unwrap(),
+                annotation: self.last_annotation.take().map(Box::new),
+            },
+
             // TODO: support floats starting with dot (e.g., `.3`)
             // (this is not trivial since it conflicts with TokenKind::Period)
             Some(ch) if ch.is_ascii_digit() => return Some(self.number_literal()),
@@ -450,8 +464,6 @@ impl<'a> Iterator for Lexer<'a> {
             Some(_) => return Some(Err(LexingError::UnknownChar(self.read_span().unwrap()))),
             None => return None,
         };
-
-        self.last_annotation.take(); // clear
 
         Some(Ok(token))
     }
