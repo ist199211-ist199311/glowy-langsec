@@ -104,6 +104,7 @@ pub enum ExprNode<'a> {
     Name(OperandNameNode<'a>),
     Literal(LiteralNode),
     Call(CallNode<'a>),
+    Indexing(IndexingNode<'a>),
     // TODO: more primary expressions...
     UnaryOp {
         kind: UnaryOpKind,
@@ -168,6 +169,12 @@ impl<'a> From<CallNode<'a>> for ExprNode<'a> {
     }
 }
 
+impl<'a> From<IndexingNode<'a>> for ExprNode<'a> {
+    fn from(node: IndexingNode<'a>) -> Self {
+        Self::Indexing(node)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct OperandNameNode<'a> {
     pub package: Option<Span<'a>>, // for qualified operand names
@@ -184,6 +191,12 @@ pub struct CallNode<'a> {
     pub func: Box<ExprNode<'a>>,
     pub args: Vec<ExprNode<'a>>,
     pub variadic: bool, // whether the last argument is "x..."
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IndexingNode<'a> {
+    pub expr: Box<ExprNode<'a>>,
+    pub index: Box<ExprNode<'a>>,
 }
 
 pub type BlockNode<'a> = Vec<StatementNode<'a>>;
