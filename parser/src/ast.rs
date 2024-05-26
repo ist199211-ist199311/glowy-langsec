@@ -65,7 +65,17 @@ pub enum TypeNode<'a> {
         id: Span<'a>,
         args: Vec<TypeNode<'a>>,
     },
+    Channel {
+        r#type: Box<TypeNode<'a>>, // what values can be sent/received
+        direction: Option<ChannelDirection>,
+    },
     // TODO: Literal
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ChannelDirection {
+    Send,
+    Receive,
 }
 
 #[derive(Debug, PartialEq)]

@@ -62,6 +62,7 @@ pub enum TokenKind {
     Ident,
 
     // keywords
+    Chan,
     Const,
     Else,
     Func,
@@ -108,6 +109,7 @@ impl<'a> Token<'a> {
         annotation: &mut Option<Annotation<'a>>,
     ) -> Self {
         let kind = match span.content {
+            "chan" => TokenKind::Chan,
             "const" => TokenKind::Const,
             "else" => TokenKind::Else,
             "func" => TokenKind::Func,
