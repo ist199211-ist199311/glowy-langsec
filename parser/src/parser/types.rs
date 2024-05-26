@@ -103,9 +103,8 @@ pub fn parse_type<'a>(s: &mut TokenStream<'a>) -> PResult<'a, TypeNode<'a>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{lexer::Lexer, Span};
-
     use super::*;
+    use crate::{lexer::Lexer, Span};
 
     fn parse(input: &str) -> PResult<'_, TypeNode<'_>> {
         let mut lexer = Lexer::new(input).peekable();

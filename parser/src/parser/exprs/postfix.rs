@@ -11,6 +11,9 @@ pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a
 
     // TODO: support trailing comma
 
+    // TODO: support type argument at the beginning
+    // ^ (in general, indistinguishable from expression? e.g. "int" vs "abc")
+
     let args = parse_expressions_list_while(s, |token| {
         !matches!(token.kind, TokenKind::Ellipsis | TokenKind::ParenR)
     })?
