@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use parser::Span;
+
 use crate::labels::Label;
 
 pub type SymbolScope<'a> = HashMap<&'a str, Symbol<'a>>;
@@ -28,17 +30,13 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
         }
     }
 
-    // return true if already exists
-    pub fn create_symbol(&mut self, symbol: Symbol<'a>) -> bool {
+    // return and replace symbol if already exists
+    pub fn create_symbol(&mut self, symbol: Symbol<'a>) -> Option<Symbol<'a>> {
         let scope = self
             .scopes
             .last_mut()
             .expect("symbol table should always have at least one scope");
-        if scope.get(symbol.name).is_some() {
-            return true;
-        }
-        scope.insert(symbol.name, symbol);
-        false
+        scope.insert(symbol.name.content(), symbol)
     }
 
     pub fn get_symbol_label<'c>(&'c self, symbol_name: &str) -> Option<&'c Label<'a>> {
@@ -75,12 +73,12 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
 #[derive(Debug, Clone)]
 pub struct Symbol<'a> {
     package: Option<&'a str>, // for qualified operand names
-    name: &'a str,
+    name: Span<'a>,
     label: Label<'a>,
 }
 
 impl<'a> Symbol<'a> {
-    pub fn new_with_package(package: &'a str, name: &'a str, label: Label<'a>) -> Symbol<'a> {
+    pub fn new_with_package(package: &'a str, name: Span<'a>, label: Label<'a>) -> Symbol<'a> {
         Symbol {
             package: Some(package),
             name,
@@ -90,7 +88,7 @@ impl<'a> Symbol<'a> {
 
     // TODO needed?
     #[allow(dead_code)]
-    pub fn new(name: &'a str, label: Label<'a>) -> Symbol<'a> {
+    pub fn new(name: Span<'a>, label: Label<'a>) -> Symbol<'a> {
         Symbol {
             package: None,
             name,

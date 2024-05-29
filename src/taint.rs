@@ -74,9 +74,9 @@ fn visit_binding_decl_spec<'a>(
             }
         }
 
-        if context.symbol_table.create_symbol(Symbol::new_with_package(
+        if let Some(prev_symbol) = context.symbol_table.create_symbol(Symbol::new_with_package(
             context.current_package(),
-            name.content(),
+            name.clone(),
             label,
         )) {
             context.report_error(name.location(), AnalysisError::Redeclaration)
@@ -89,9 +89,9 @@ fn visit_function_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &Functi
 
     for param in &node.signature.params {
         for id in &param.ids {
-            if context.symbol_table.create_symbol(Symbol::new_with_package(
+            if let Some(prev_symbol) = context.symbol_table.create_symbol(Symbol::new_with_package(
                 context.current_package(),
-                id.content(),
+                id.clone(),
                 Label::Bottom, // TODO: make label depend on calls to function
             )) {
                 context.report_error(id.location(), AnalysisError::Redeclaration)
