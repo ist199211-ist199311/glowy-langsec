@@ -80,7 +80,28 @@ fn get_diagnostic_for_error<'a>(
                 )
                 .to_owned()])
         }
-        AnalysisError::DataFlow => todo!(),
+        AnalysisError::DataFlowAssignment {
+            file,
+            symbol,
+            sink_label,
+            expression_label,
+        } => {
+            Diagnostic::error()
+                .with_code("E001")
+                .with_message(s!("insecure data flow to sink during assigment"))
+                .with_labels(vec![
+                    Label::primary(file, symbol.location()).with_message(format!(
+                        "sink `{}` has label {}, but the expression being assigned to it has \
+                         label {}",
+                        symbol.content(),
+                        sink_label,
+                        expression_label
+                    )),
+                    // TODO: when the error supports it, show where the labels of the expression
+                    // come from
+                ])
+        }
+        AnalysisError::DataFlowFuncCall => todo!(),
         AnalysisError::UnknownSymbol { file, symbol } => Diagnostic::warning()
             .with_code("W001")
             .with_message(s!("symbol not found"))

@@ -2,6 +2,8 @@ use std::ops::Range;
 
 use parser::{ParsingError, Span};
 
+use crate::labels::Label;
+
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct ErrorLocation {
     file: usize,
@@ -21,7 +23,14 @@ pub enum AnalysisError<'a> {
         file: usize,
         error: ParsingError<'a>,
     },
-    DataFlow,
+    DataFlowAssignment {
+        file: usize,
+        symbol: Span<'a>,
+        sink_label: Label<'a>,
+        expression_label: Label<'a>,
+        // TODO path of symbols that yielded the label
+    },
+    DataFlowFuncCall,
     UnknownSymbol {
         file: usize,
         symbol: Span<'a>,

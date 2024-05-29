@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::BTreeSet, ops::BitOr};
+use std::{cmp::Ordering, collections::BTreeSet, fmt::Display, ops::BitOr};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Label<'a> {
@@ -50,6 +50,26 @@ impl<'a> PartialOrd for Label<'a> {
                     None
                 }
             }
+        }
+    }
+}
+
+impl<'a> Display for Label<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Label::Top => write!(f, "<top>"),
+            Label::Parts(parts) => {
+                write!(f, "{{")?;
+                let mut iter = parts.iter();
+                if let Some(first) = iter.next() {
+                    write!(f, "{}", first)?;
+                    for part in iter {
+                        write!(f, ", {}", part)?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            Label::Bottom => write!(f, "{{}}"),
         }
     }
 }

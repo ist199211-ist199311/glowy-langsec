@@ -64,9 +64,15 @@ fn visit_binding_decl_spec<'a>(
                 "sink" => {
                     let sink_label = Label::from_parts(&annotation.labels);
                     match label.partial_cmp(&sink_label) {
-                        None | Some(Ordering::Greater) => {
-                            context.report_error(name.location(), AnalysisError::DataFlow)
-                        }
+                        None | Some(Ordering::Greater) => context.report_error(
+                            name.location(),
+                            AnalysisError::DataFlowAssignment {
+                                file: context.file(),
+                                symbol: name.clone(),
+                                sink_label,
+                                expression_label: label.clone(),
+                            },
+                        ),
                         _ => {}
                     }
                 }
@@ -180,7 +186,7 @@ fn visit_call<'a>(context: &mut VisitFileContext<'a, '_>, node: &CallNode<'a>) -
                 match arg_label.partial_cmp(&sink_label) {
                     None | Some(Ordering::Greater) => {
                         // TODO: FIXME: parser does not have a way to get the location of args
-                        context.report_error(0..0, AnalysisError::DataFlow)
+                        context.report_error(0..0, AnalysisError::DataFlowFuncCall)
                     }
                     _ => {}
                 }
