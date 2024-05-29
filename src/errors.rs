@@ -26,5 +26,9 @@ pub enum AnalysisError<'a> {
         file: usize,
         symbol: Span<'a>,
     },
-    Redeclaration,
+    Redeclaration {
+        file: usize,
+        prev_symbol: Span<'a>,
+        new_symbol: Span<'a>,
+    },
 }

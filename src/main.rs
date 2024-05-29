@@ -87,6 +87,27 @@ fn get_diagnostic_for_error<'a>(
             .with_labels(vec![Label::primary(file, symbol.location()).with_message(
                 format!("symbol `{}` has not been declared", symbol.content()),
             )]),
-        AnalysisError::Redeclaration => todo!(),
+        AnalysisError::Redeclaration {
+            file,
+            prev_symbol,
+            new_symbol,
+        } => Diagnostic::warning()
+            .with_code("W002")
+            .with_message(s!("symbol redeclaration"))
+            .with_labels(vec![
+                Label::primary(file, new_symbol.location()).with_message(format!(
+                    "symbol `{}` has already been declared",
+                    new_symbol.content()
+                )),
+                Label::secondary(file, prev_symbol.location()).with_message(format!(
+                    "previous declaraction of `{}` is here",
+                    prev_symbol.content()
+                )),
+            ])
+            .with_notes(vec![concat!(
+                "note: for static analysis purposes, the redeclaration is ",
+                "taken into account, replacing the previous symbol"
+            )
+            .to_owned()]),
     }
 }

@@ -95,4 +95,8 @@ impl<'a> Symbol<'a> {
             label,
         }
     }
+
+    pub fn name(&self) -> &Span<'a> {
+        &self.name
+    }
 }

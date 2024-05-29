@@ -79,7 +79,14 @@ fn visit_binding_decl_spec<'a>(
             name.clone(),
             label,
         )) {
-            context.report_error(name.location(), AnalysisError::Redeclaration)
+            context.report_error(
+                name.location(),
+                AnalysisError::Redeclaration {
+                    file: context.file(),
+                    prev_symbol: prev_symbol.name().clone(),
+                    new_symbol: name.clone(),
+                },
+            )
         }
     }
 }
@@ -94,7 +101,14 @@ fn visit_function_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &Functi
                 id.clone(),
                 Label::Bottom, // TODO: make label depend on calls to function
             )) {
-                context.report_error(id.location(), AnalysisError::Redeclaration)
+                context.report_error(
+                    id.location(),
+                    AnalysisError::Redeclaration {
+                        file: context.file(),
+                        prev_symbol: prev_symbol.name().clone(),
+                        new_symbol: id.clone(),
+                    },
+                )
             }
         }
     }
