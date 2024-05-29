@@ -51,6 +51,12 @@ fn get_diagnostic_for_error<'a>(
     error: AnalysisError<'a>,
     files: &SimpleFiles<&'a str, &'a str>,
 ) -> Diagnostic<usize> {
+    macro_rules! s {
+        ($lit:expr) => {
+            $lit.to_owned()
+        };
+    }
+
     match error {
         AnalysisError::Parsing { file, error } => {
             let info = error.diagnostics();
@@ -75,7 +81,12 @@ fn get_diagnostic_for_error<'a>(
                 .to_owned()])
         }
         AnalysisError::DataFlow => todo!(),
-        AnalysisError::UnknownSymbol => todo!(),
+        AnalysisError::UnknownSymbol { file, symbol } => Diagnostic::warning()
+            .with_code("W001")
+            .with_message(s!("symbol not found"))
+            .with_labels(vec![Label::primary(file, symbol.location()).with_message(
+                format!("symbol `{}` has not been declared", symbol.content()),
+            )]),
         AnalysisError::Redeclaration => todo!(),
     }
 }

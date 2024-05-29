@@ -131,7 +131,13 @@ fn visit_expr<'a>(context: &mut VisitFileContext<'a, '_>, node: &ExprNode<'a>) -
         ExprNode::Name(name) => match context.symtab().get_symbol_label(name.id.content()) {
             Some(label) => label.clone(),
             None => {
-                context.report_error(name.id.location(), AnalysisError::UnknownSymbol);
+                context.report_error(
+                    name.id.location(),
+                    AnalysisError::UnknownSymbol {
+                        file: context.file(),
+                        symbol: name.id.clone(),
+                    },
+                );
                 Label::Bottom
             }
         },

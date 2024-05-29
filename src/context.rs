@@ -69,6 +69,10 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         }
     }
 
+    pub fn file(&self) -> usize {
+        self.file_id
+    }
+
     pub fn current_package(&self) -> &'a str {
         self.current_package
     }

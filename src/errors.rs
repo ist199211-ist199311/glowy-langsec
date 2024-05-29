@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use parser::ParsingError;
+use parser::{ParsingError, Span};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct ErrorLocation {
@@ -22,6 +22,9 @@ pub enum AnalysisError<'a> {
         error: ParsingError<'a>,
     },
     DataFlow,
-    UnknownSymbol,
+    UnknownSymbol {
+        file: usize,
+        symbol: Span<'a>,
+    },
     Redeclaration,
 }
