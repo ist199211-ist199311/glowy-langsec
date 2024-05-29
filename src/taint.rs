@@ -43,7 +43,9 @@ fn visit_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &DeclNode<'a>) {
                 visit_binding_decl_spec(context, spec, annotation);
             }
         }
-        DeclNode::Function(_) => todo!(),
+        DeclNode::Function(func_node) => {
+            visit_function_decl(context, func_node);
+        }
     }
 }
 
@@ -80,6 +82,48 @@ fn visit_binding_decl_spec<'a>(
         )) {
             context.report_error(name.location(), AnalysisError::Redeclaration)
         }
+    }
+}
+
+fn visit_function_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &FunctionDeclNode<'a>) {
+    context.symbol_table.push();
+
+    for param in &node.signature.params {
+        for id in &param.ids {
+            if context.symbol_table.create_symbol(Symbol::new_with_package(
+                context.current_package(),
+                id.content(),
+                Label::Bottom, // TODO: make label depend on calls to function
+            )) {
+                context.report_error(id.location(), AnalysisError::Redeclaration)
+            }
+        }
+    }
+
+    for statements in &node.body {
+        visit_statement(context, statements);
+    }
+
+    context.symbol_table.pop();
+}
+
+fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementNode<'a>) {
+    match node {
+        StatementNode::Empty => {}
+        StatementNode::Expr(expr_node) => {
+            visit_expr(context, expr_node);
+        }
+        StatementNode::Send(_) => todo!(),
+        StatementNode::Inc(_) | StatementNode::Dec(_) => todo!(),
+        StatementNode::Assignment(_) => todo!(),
+        StatementNode::ShortVarDecl(_) => todo!(),
+        StatementNode::Decl(decl_node) => {
+            visit_decl(context, decl_node);
+        }
+        StatementNode::If(_) => todo!(),
+        StatementNode::Block(_) => todo!(),
+        StatementNode::Return(_) => todo!(),
+        StatementNode::Go(_) => todo!(),
     }
 }
 

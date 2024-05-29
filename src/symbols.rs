@@ -59,6 +59,17 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
             .next()
             .expect("symbol table should always have at least one scope")
     }
+
+    pub fn push(&mut self) {
+        self.scopes.push(SymbolScope::new());
+    }
+
+    pub fn pop(&mut self) {
+        if self.scopes.len() <= 1 {
+            panic!("cannot pop the last symbol scope in the symbol table");
+        }
+        self.scopes.pop();
+    }
 }
 
 #[derive(Debug, Clone)]
