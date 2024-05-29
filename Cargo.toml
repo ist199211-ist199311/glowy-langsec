@@ -21,4 +21,5 @@ repository = "https://github.com/ist199211-ist199311/glowy-langsec"
 license = "MIT"
 
 [dependencies]
+codespan-reporting.workspace = true
 parser = { path = "parser" }

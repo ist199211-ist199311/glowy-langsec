@@ -16,7 +16,7 @@ pub struct AnalysisContext<'a> {
     functions: HashMap<(&'a str, &'a str), FunctionContext>,
     /// Map of error location and the respective error.
     /// This is a map to avoid reporting the same error multiple times.
-    pub errors: HashMap<ErrorLocation<'a>, AnalysisError>,
+    pub errors: HashMap<ErrorLocation, AnalysisError<'a>>,
 }
 
 impl<'a> AnalysisContext<'a> {
@@ -38,29 +38,29 @@ pub struct FunctionContext {
 #[derive(Debug)]
 pub struct VisitFileContext<'a, 'b> {
     analysis_context: &'b AnalysisContext<'a>,
-    file_name: &'a str,
+    file_id: usize,
     pub symbol_table: SymbolTable<'a, 'b>,
     current_package: &'a str,
-    pub errors: HashMap<ErrorLocation<'a>, AnalysisError>,
+    pub errors: HashMap<ErrorLocation, AnalysisError<'a>>,
 }
 
 impl<'a, 'b> VisitFileContext<'a, 'b> {
     pub fn new(
         analysis_context: &'b AnalysisContext<'a>,
-        file_name: &'a str,
+        file_id: usize,
         package: &'a str,
     ) -> Self {
         VisitFileContext {
             analysis_context,
-            file_name,
+            file_id,
             symbol_table: SymbolTable::new_from_global(&analysis_context.global_scope),
             current_package: package,
             errors: HashMap::new(),
         }
     }
 
-    pub fn report_error(&mut self, location: Range<usize>, error: AnalysisError) {
-        let error_location = ErrorLocation::new(self.file_name, location);
+    pub fn report_error(&mut self, location: Range<usize>, error: AnalysisError<'a>) {
+        let error_location = ErrorLocation::new(self.file_id, location);
 
         if !self.analysis_context.errors.contains_key(&error_location)
             && !self.errors.contains_key(&error_location)

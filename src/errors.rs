@@ -1,20 +1,26 @@
 use std::ops::Range;
 
+use parser::ParsingError;
+
 #[derive(Debug, Hash, PartialEq, Eq)]
-pub struct ErrorLocation<'a> {
-    file: &'a str,
+pub struct ErrorLocation {
+    file: usize,
     location: Range<usize>, // location in file (from span)
 }
 
-impl<'a> ErrorLocation<'a> {
-    pub fn new(file: &'a str, location: Range<usize>) -> Self {
+impl ErrorLocation {
+    pub fn new(file: usize, location: Range<usize>) -> Self {
         Self { file, location }
     }
 }
 
 #[derive(Debug)]
-pub enum AnalysisError {
+pub enum AnalysisError<'a> {
     // TODO
+    Parsing {
+        file: usize,
+        error: ParsingError<'a>,
+    },
     DataFlow,
     UnknownSymbol,
     Redeclaration,

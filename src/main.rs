@@ -1,6 +1,15 @@
 use std::{env, fs, io};
 
-use glowy::analyze_files;
+use codespan_reporting::{
+    diagnostic::{Diagnostic, Label},
+    files::SimpleFiles,
+    term::{
+        self,
+        termcolor::{ColorChoice, StandardStream},
+    },
+};
+use glowy::{analyze_files, errors::AnalysisError};
+use parser::Diagnostics;
 
 fn main() {
     let path = env::args().nth(1);
@@ -15,10 +24,58 @@ fn main() {
         files.push(("<stdin>".to_string(), content));
     };
 
-    let files = files
-        .iter()
-        .map(|(file_name, contents)| (file_name.as_str(), contents.as_str()));
+    let mut codespan_files = SimpleFiles::new();
+    let files_to_analyze = files.iter().map(|(file_name, contents)| {
+        (
+            codespan_files.add(file_name.as_str(), contents.as_str()),
+            contents.as_str(),
+        )
+    });
 
-    let context = analyze_files(files);
-    dbg!(context);
+    match analyze_files(files_to_analyze) {
+        Ok(_) => println!("Analysis succeeded with no errors found"),
+        Err(errors) => {
+            let writer = StandardStream::stderr(ColorChoice::Auto);
+            let config = term::Config::default();
+
+            for error in errors {
+                let diagnostic = get_diagnostic_for_error(error, &codespan_files);
+                term::emit(&mut writer.lock(), &config, &codespan_files, &diagnostic)
+                    .expect("Failed to show error");
+            }
+        }
+    }
+}
+
+fn get_diagnostic_for_error<'a>(
+    error: AnalysisError<'a>,
+    files: &SimpleFiles<&'a str, &'a str>,
+) -> Diagnostic<usize> {
+    match error {
+        AnalysisError::Parsing { file, error } => {
+            let info = error.diagnostics();
+            let location = if let Some(ctx) = info.context {
+                ctx.location()
+            } else {
+                // default to last char to represent eof;
+                // note that this might return an empty range if input is empty
+                let input = files.get(file).expect("file to exist").source();
+                input.len().saturating_sub(1)..input.len()
+            };
+            Diagnostic::error()
+                .with_code(info.code)
+                .with_message(info.overview)
+                .with_labels(vec![
+                    Label::primary(file, location).with_message(info.details)
+                ])
+                .with_notes(vec![concat!(
+                    "help: if you're sure your Go syntax is correct, ",
+                    "this parser may not support that construct"
+                )
+                .to_owned()])
+        }
+        AnalysisError::DataFlow => todo!(),
+        AnalysisError::UnknownSymbol => todo!(),
+        AnalysisError::Redeclaration => todo!(),
+    }
 }

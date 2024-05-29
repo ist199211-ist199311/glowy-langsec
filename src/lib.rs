@@ -1,30 +1,46 @@
+use errors::AnalysisError;
+
 use crate::{context::AnalysisContext, taint::visit_source_file};
 
 mod context;
-mod errors;
+pub mod errors;
 mod labels;
 mod symbols;
 mod taint;
 
-// files is an iterator of file name and file content
+// files is an iterator of file id and file content
 pub fn analyze_files<'a>(
-    files: impl IntoIterator<Item = (&'a str, &'a str)>,
-) -> AnalysisContext<'a> {
+    files: impl IntoIterator<Item = (usize, &'a str)>,
+) -> Result<(), Vec<AnalysisError<'a>>> {
     let mut context = AnalysisContext::new();
 
-    let parsed = files
-        .into_iter()
-        .map(|(file_name, contents)| parser::parse(contents).map(|result| (file_name, result)))
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+    let mut errors = vec![];
+    let mut parsed = vec![];
+    for (file_id, contents) in files {
+        match parser::parse(contents) {
+            Ok(ast) => parsed.push((file_id, ast)),
+            Err(error) => errors.push(AnalysisError::Parsing {
+                file: file_id,
+                error,
+            }),
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(errors);
+    }
 
     let mut changed = true;
     while changed {
         changed = false;
-        for (file_name, node) in &parsed {
-            changed |= visit_source_file(&mut context, file_name, node);
+        for (file_id, node) in &parsed {
+            changed |= visit_source_file(&mut context, *file_id, node);
         }
     }
 
-    context
+    if context.errors.is_empty() {
+        Ok(())
+    } else {
+        Err(context.errors.into_values().collect::<Vec<_>>())
+    }
 }

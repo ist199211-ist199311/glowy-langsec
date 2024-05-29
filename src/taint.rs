@@ -11,15 +11,14 @@ use crate::{
 
 pub fn visit_source_file<'a>(
     context: &mut AnalysisContext<'a>,
-    file_name: &'a str,
+    file_id: usize,
     node: &SourceFileNode<'a>,
 ) -> bool {
     let package = node.package_clause.id.content();
 
     let mut changed = false;
 
-    // TODO file name
-    let mut visit_context = VisitFileContext::new(context, file_name, package);
+    let mut visit_context = VisitFileContext::new(context, file_id, package);
 
     for decl in &node.top_level_decls {
         visit_decl(&mut visit_context, decl);
