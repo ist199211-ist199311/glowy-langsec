@@ -143,7 +143,33 @@ fn visit_expr<'a>(context: &mut VisitFileContext<'a, '_>, node: &ExprNode<'a>) -
             let rlabel = visit_expr(context, right.as_ref());
             llabel.union(&rlabel)
         }
-        ExprNode::Call(_) => todo!(),
+        ExprNode::Call(call_node) => visit_call(context, call_node),
         ExprNode::Indexing(_) => todo!(),
     }
+}
+
+fn visit_call<'a>(context: &mut VisitFileContext<'a, '_>, node: &CallNode<'a>) -> Label<'a> {
+    // TODO: use `node.func` to more accurately determine label
+
+    let mut label = Label::Bottom;
+    for arg in &node.args {
+        let arg_label = visit_expr(context, arg);
+
+        if let Some(annotation) = &node.annotation {
+            if annotation.scope == "sink" {
+                let sink_label = Label::from_parts(&annotation.labels);
+                match arg_label.partial_cmp(&sink_label) {
+                    None | Some(Ordering::Greater) => {
+                        // TODO: FIXME: parser does not have a way to get the location of args
+                        context.report_error(0..0, AnalysisError::DataFlow)
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        label = label.union(&arg_label);
+    }
+
+    label
 }
