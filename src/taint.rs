@@ -59,7 +59,7 @@ fn visit_binding_decl_spec<'a>(
         if let Some(annotation) = annotation {
             match annotation.scope {
                 "label" => {
-                    label = Label::from_parts(&annotation.labels);
+                    label = label.union(&Label::from_parts(&annotation.labels));
                 }
                 "sink" => {
                     let sink_label = Label::from_parts(&annotation.labels);
