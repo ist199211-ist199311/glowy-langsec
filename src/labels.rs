@@ -53,3 +53,112 @@ impl<'a> PartialOrd for Label<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{cmp::Ordering, collections::BTreeSet};
+
+    use super::Label;
+
+    #[test]
+    fn label_constructor() {
+        assert_eq!(Label::from_parts(&[]), Label::Bottom);
+        assert_eq!(
+            Label::from_parts(&["lbl1", "lbl2"]),
+            Label::Parts(BTreeSet::from(["lbl1", "lbl2"]))
+        );
+    }
+
+    #[test]
+    fn label_union() {
+        macro_rules! union {
+            ($left: expr, $right: expr, $expected: expr) => {
+                assert_eq!($left.union(&$right), $expected);
+                assert_eq!($right.union(&$left), $expected);
+            };
+        }
+
+        union!(Label::Top, Label::Top, Label::Top);
+        union!(Label::Top, Label::from_parts(&["lbl1"]), Label::Top);
+        union!(Label::Top, Label::Bottom, Label::Top);
+
+        union!(
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::from_parts(&["lbl2", "lbl3"]),
+            Label::from_parts(&["lbl1", "lbl2", "lbl3"])
+        );
+        union!(
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::Bottom,
+            Label::from_parts(&["lbl1", "lbl3"])
+        );
+
+        union!(Label::Bottom, Label::Bottom, Label::Bottom);
+    }
+
+    #[test]
+    fn compare_labels() {
+        macro_rules! cmp {
+            ($left: expr, $right: expr, $expected: expr) => {
+                assert_eq!($left.partial_cmp(&$right), $expected);
+            };
+        }
+
+        cmp!(Label::Bottom, Label::Bottom, Some(Ordering::Equal));
+        cmp!(Label::Top, Label::Top, Some(Ordering::Equal));
+        cmp!(Label::Bottom, Label::Top, Some(Ordering::Less));
+        cmp!(Label::Top, Label::Bottom, Some(Ordering::Greater));
+
+        cmp!(
+            Label::Top,
+            Label::from_parts(&["lbl1"]),
+            Some(Ordering::Greater)
+        );
+        cmp!(
+            Label::from_parts(&["lbl1"]),
+            Label::Top,
+            Some(Ordering::Less)
+        );
+        cmp!(
+            Label::Bottom,
+            Label::from_parts(&["lbl1"]),
+            Some(Ordering::Less)
+        );
+        cmp!(
+            Label::from_parts(&["lbl1"]),
+            Label::Bottom,
+            Some(Ordering::Greater)
+        );
+
+        cmp!(
+            Label::from_parts(&["lbl1"]),
+            Label::from_parts(&["lbl2"]),
+            None
+        );
+        cmp!(
+            Label::from_parts(&["lbl2"]),
+            Label::from_parts(&["lbl1"]),
+            None
+        );
+        cmp!(
+            Label::from_parts(&["lbl1", "lbl2"]),
+            Label::from_parts(&["lbl2"]),
+            Some(Ordering::Greater)
+        );
+        cmp!(
+            Label::from_parts(&["lbl1"]),
+            Label::from_parts(&["lbl1", "lbl2"]),
+            Some(Ordering::Less)
+        );
+        cmp!(
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::from_parts(&["lbl1", "lbl2"]),
+            None
+        );
+        cmp!(
+            Label::from_parts(&["lbl1", "lbl2"]),
+            Label::from_parts(&["lbl1", "lbl3"]),
+            None
+        );
+    }
+}
