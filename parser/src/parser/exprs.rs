@@ -36,6 +36,16 @@ pub fn parse_primary_expression<'a>(s: &mut TokenStream<'a>) -> PResult<'a, Expr
 
             LiteralNode::Int(v).into()
         }
+        Some(of_kind!(TokenKind::Rune(v))) => {
+            s.next(); // advance
+
+            LiteralNode::Rune(v).into()
+        }
+        Some(of_kind!(TokenKind::String(v))) => {
+            s.next(); // advance
+
+            LiteralNode::String(v).into()
+        }
         Some(of_kind!(TokenKind::ParenL)) => {
             s.next(); // advance
             let inner = parse_expression(s)?;

@@ -194,6 +194,8 @@ pub struct OperandNameNode<'a> {
 #[derive(Debug, PartialEq)]
 pub enum LiteralNode {
     Int(u64),
+    Rune(char),
+    String(String),
 }
 
 #[derive(Debug, PartialEq)]

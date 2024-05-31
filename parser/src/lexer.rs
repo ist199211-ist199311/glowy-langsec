@@ -9,11 +9,16 @@ use crate::{
     Span,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LexingError<'a> {
     UnknownChar(Span<'a>),
     InvalidNumberLiteralChar(Span<'a>),
     IntParseFailure(Span<'a>, ParseIntError),
+    MultipleCharactersInRune(Span<'a>),
+    EmptyRune(Span<'a>),
+    LineBreakInString(Span<'a>),
+    InvalidStringEscapeSequence(Span<'a>),
+    UnclosedString,
 }
 
 impl<'a> Diagnostics<'a> for LexingError<'a> {
@@ -43,6 +48,36 @@ impl<'a> Diagnostics<'a> for LexingError<'a> {
                 details: err.to_string(),
                 context: Some(context.clone()),
             },
+            Self::MultipleCharactersInRune(context) => ErrorDiagnosticInfo {
+                code: s!("L004"),
+                overview: s!("multiple characters in rune"),
+                details: s!("found more than one character in the given rune"),
+                context: Some(context.clone()),
+            },
+            Self::EmptyRune(context) => ErrorDiagnosticInfo {
+                code: s!("L005"),
+                overview: s!("empty rune"),
+                details: s!("found no characters in the given rune"),
+                context: Some(context.clone()),
+            },
+            Self::LineBreakInString(context) => ErrorDiagnosticInfo {
+                code: s!("L006"),
+                overview: s!("line break in string"),
+                details: s!("the newline character (\\n) is not allowed in string literals"),
+                context: Some(context.clone()),
+            },
+            Self::InvalidStringEscapeSequence(context) => ErrorDiagnosticInfo {
+                code: s!("L007"),
+                overview: s!("invalid escape sequence"),
+                details: s!("escape sequence in string is invalid"),
+                context: Some(context.clone()),
+            },
+            Self::UnclosedString => ErrorDiagnosticInfo {
+                code: s!("L008"),
+                overview: s!("unclosed string"),
+                details: s!("reached EOF before finding a closing string delimiter"),
+                context: None,
+            },
         }
     }
 }
@@ -59,6 +94,8 @@ pub struct Lexer<'a> {
 
     annotation_regex: Regex, // prevent constant recompilation (slow)
     last_annotation: Option<Annotation<'a>>, // prevent clearing by whitespace
+
+    enable_implicit_semicolon: bool, // whether to enable implicit semicolon insertion
 }
 
 type LResult<'a> = Result<Token<'a>, LexingError<'a>>;
@@ -77,6 +114,8 @@ impl<'a> Lexer<'a> {
             annotation_regex: Regex::new(r#"glowy::(?P<scope>\w+)::\{(?P<labels>[^}]*)\}"#)
                 .unwrap(),
             last_annotation: None,
+
+            enable_implicit_semicolon: true,
         }
     }
 
@@ -95,11 +134,12 @@ impl<'a> Lexer<'a> {
             if ch == '\n' {
                 self.line += 1;
 
-                if self
-                    .last_token_kind
-                    .as_ref()
-                    .map(TokenKind::allows_implicit_semicolon)
-                    .unwrap_or(false)
+                if self.enable_implicit_semicolon
+                    && self
+                        .last_token_kind
+                        .as_ref()
+                        .map(TokenKind::allows_implicit_semicolon)
+                        .unwrap_or(false)
                 {
                     // newline is guaranteed single-byte, no panic
                     let span = Span::new(&view[..1], original_offset, original_line);
@@ -294,6 +334,222 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn string_like_literal(&mut self) -> LResult<'a> {
+        enum StringLexMode {
+            Unknown,
+            Rune,              // unicode character ('a')
+            InterpretedString, // "hello\nworld"
+            RawString,         // `hello world`
+        }
+
+        enum StringLexEscapeMode {
+            Normal,
+            Backslash,
+            EscapedUnicode {
+                value: u32,
+                read_count: u8,
+                radix: u32,
+                expected_count: u8,
+                max_value: u32,
+            },
+        }
+
+        struct StringLexState<'a> {
+            mode: StringLexMode,
+            escape_mode: StringLexEscapeMode,
+            last_char: Option<char>,
+            string: String,
+            finished: bool, // whether closing delimiter has been read
+            err: Option<LexingError<'a>>,
+        }
+
+        macro_rules! push_char {
+            ($state:expr, $char:expr) => {{
+                if let Some(c) = $state.last_char {
+                    $state.string.push(c);
+                }
+                $state.last_char = Some($char);
+                $state.escape_mode = StringLexEscapeMode::Normal;
+            }};
+        }
+
+        let prev_implicit_semicolon = self.enable_implicit_semicolon;
+        self.enable_implicit_semicolon = false;
+
+        let (span, state) = self.accumulate_while(
+            StringLexState {
+                mode: StringLexMode::Unknown,
+                escape_mode: StringLexEscapeMode::Normal,
+                last_char: None,
+                string: String::new(),
+                finished: false,
+                err: None,
+            },
+            |ch, state, lexer| {
+                if state.finished {
+                    return false;
+                }
+                match &mut state.escape_mode {
+                    StringLexEscapeMode::Normal => match (ch, &state.mode) {
+                        ('\'', StringLexMode::Unknown) => state.mode = StringLexMode::Rune,
+                        ('"', StringLexMode::Unknown) => {
+                            state.mode = StringLexMode::InterpretedString
+                        }
+                        ('`', StringLexMode::Unknown) => state.mode = StringLexMode::RawString,
+                        (_, StringLexMode::Unknown) => unreachable!(
+                            "function string_like_literal called on non-string boundary"
+                        ),
+
+                        ('\'', StringLexMode::Rune) => {
+                            // end rune
+                            state.finished = true;
+                        }
+                        (_, StringLexMode::Rune) if state.last_char.is_some() => {
+                            // rune already has character, but closing quote not found
+                            let span = lexer.read_span().unwrap();
+                            state.err = Some(LexingError::MultipleCharactersInRune(span));
+                            return false;
+                        }
+                        ('`', StringLexMode::RawString)
+                        | ('"', StringLexMode::InterpretedString) => {
+                            // end raw and interpreted string
+                            if let Some(c) = state.last_char {
+                                state.string.push(c);
+                                state.last_char = None;
+                            }
+                            state.finished = true;
+                        }
+                        ('\\', StringLexMode::Rune) | ('\\', StringLexMode::InterpretedString) => {
+                            state.escape_mode = StringLexEscapeMode::Backslash;
+                        }
+                        ('\n', StringLexMode::Rune) | ('\n', StringLexMode::InterpretedString) => {
+                            let span = lexer.read_span().unwrap();
+                            state.err = Some(LexingError::LineBreakInString(span));
+                            return false;
+                        }
+                        ('\r', StringLexMode::RawString) => {} // carriage returns are discarded
+                        // in raw strings
+                        _ => push_char!(state, ch),
+                    },
+                    StringLexEscapeMode::Backslash => {
+                        match (ch, &state.mode) {
+                            ('a', _) => push_char!(state, '\u{0007}'),
+                            ('b', _) => push_char!(state, '\u{0008}'),
+                            ('f', _) => push_char!(state, '\u{000c}'),
+                            ('n', _) => push_char!(state, '\n'),
+                            ('r', _) => push_char!(state, '\r'),
+                            ('t', _) => push_char!(state, '\u{0009}'),
+                            ('v', _) => push_char!(state, '\u{000b}'),
+                            ('\\', _) => push_char!(state, '\\'),
+                            ('\'', StringLexMode::Rune) => push_char!(state, '\''),
+                            ('"', StringLexMode::InterpretedString) => push_char!(state, '"'),
+
+                            ('0'..='7', _) => {
+                                state.escape_mode = StringLexEscapeMode::EscapedUnicode {
+                                    value: ch.to_digit(8).expect("char to be a valid octal digit"),
+                                    read_count: 1,
+                                    radix: 8,
+                                    expected_count: 3,
+                                    max_value: u8::MAX as u32,
+                                }
+                            }
+                            ('x', _) => {
+                                state.escape_mode = StringLexEscapeMode::EscapedUnicode {
+                                    value: 0,
+                                    read_count: 0,
+                                    radix: 16,
+                                    expected_count: 2,
+                                    max_value: u8::MAX as u32,
+                                }
+                            }
+                            ('u', _) => {
+                                state.escape_mode = StringLexEscapeMode::EscapedUnicode {
+                                    value: 0,
+                                    read_count: 0,
+                                    radix: 16,
+                                    expected_count: 4,
+                                    max_value: u32::MAX,
+                                }
+                            }
+                            ('U', _) => {
+                                state.escape_mode = StringLexEscapeMode::EscapedUnicode {
+                                    value: 0,
+                                    read_count: 0,
+                                    radix: 16,
+                                    expected_count: 8,
+                                    max_value: u32::MAX,
+                                }
+                            }
+
+                            (_, _) => {
+                                // error: invalid char after backslash
+                                let span = lexer.read_span().unwrap();
+                                state.err = Some(LexingError::InvalidStringEscapeSequence(span));
+                                return false;
+                            }
+                        }
+                    }
+                    StringLexEscapeMode::EscapedUnicode {
+                        value,
+                        read_count,
+                        radix,
+                        expected_count,
+                        max_value,
+                    } => {
+                        match ch
+                            .to_digit(*radix)
+                            .and_then(|digit| {
+                                value.checked_mul(*radix).and_then(|v| v.checked_add(digit))
+                            })
+                            .filter(|v| v <= max_value)
+                            .and_then(|v| char::from_u32(v).map(|c| (v, c)))
+                        {
+                            Some((new_value, c)) => {
+                                *value = new_value;
+                                *read_count += 1;
+                                if read_count >= expected_count {
+                                    push_char!(state, c);
+                                }
+                            }
+                            None => {
+                                // error: invalid digit
+                                let span = lexer.read_span().unwrap();
+                                state.err = Some(LexingError::InvalidStringEscapeSequence(span));
+                                return false;
+                            }
+                        }
+                    }
+                }
+
+                true
+            },
+        );
+
+        self.enable_implicit_semicolon = prev_implicit_semicolon;
+
+        if let Some(err) = state.err {
+            return Err(err);
+        };
+
+        if !state.finished {
+            // reached EOF before closing delimiter
+            return Err(LexingError::UnclosedString);
+        }
+
+        match &state.mode {
+            StringLexMode::Rune => match state.last_char {
+                Some(c) => Ok(Token::new(TokenKind::Rune(c), span)),
+                None => Err(LexingError::EmptyRune(span)),
+            },
+            StringLexMode::InterpretedString | StringLexMode::RawString => {
+                Ok(Token::new(TokenKind::String(state.string), span))
+            }
+            StringLexMode::Unknown => {
+                unreachable!("function string_like_literal called on non-string boundary")
+            }
+        }
+    }
+
     fn period_or_ellipsis(&mut self) -> Token<'a> {
         // cannot use greedy since ".." is not a valid token..
 
@@ -483,6 +739,10 @@ impl<'a> Iterator for Lexer<'a> {
                 Ok(token) => token,
                 err @ Err(_) => return Some(err),
             },
+            Some('\'') | Some('"') | Some('`') => match self.string_like_literal() {
+                Ok(token) => token,
+                err @ Err(_) => return Some(err),
+            },
 
             Some(ch) if is_letter(ch) => self.identifier_or_keyword(),
             Some(ch) if is_whitespace(ch) => {
@@ -548,6 +808,164 @@ mod tests {
             ],
             lex("\t 3 50 0b11101 0o771 0xf45\n 0123 0").unwrap()
         )
+    }
+
+    #[test]
+    fn rune_lits() {
+        assert_eq!(
+            vec![
+                Token::new(TokenKind::Rune('a'), Span::new("'a'", 2, 1)),
+                Token::new(TokenKind::Rune('\u{0007}'), Span::new("'\\a'", 6, 1)),
+                Token::new(TokenKind::Rune('\n'), Span::new("'\\n'", 11, 1)),
+                Token::new(TokenKind::SemiColon, Span::new("\n", 15, 1)),
+                Token::new(TokenKind::Rune('\''), Span::new("'\\''", 17, 2)),
+                Token::new(TokenKind::Rune('ä'), Span::new("'ä'", 22, 2)),
+                Token::new(TokenKind::Rune('本'), Span::new("'本'", 27, 2)),
+                Token::new(TokenKind::Rune('\t'), Span::new("'\\t'", 33, 2)),
+                Token::new(TokenKind::Rune('\t'), Span::new("'\t'", 38, 2)),
+                Token::new(TokenKind::Rune('\0'), Span::new("'\\000'", 42, 2)),
+                Token::new(TokenKind::Rune('\x07'), Span::new("'\\007'", 49, 2)),
+                Token::new(TokenKind::Rune('\u{ff}'), Span::new("'\\377'", 56, 2)),
+                Token::new(TokenKind::Rune('\u{07}'), Span::new("'\\x07'", 63, 2)),
+                Token::new(TokenKind::Rune('\u{ff}'), Span::new("'\\xff'", 70, 2)),
+                Token::new(TokenKind::Rune('\u{12e4}'), Span::new("'\\u12e4'", 77, 2)),
+                Token::new(
+                    TokenKind::Rune('\u{101234}'),
+                    Span::new("'\\U00101234'", 86, 2)
+                ),
+            ],
+            lex(
+                "\t 'a' '\\a' '\\n'\n '\\'' 'ä' '本' '\\t' '\t' '\\000' '\\007' '\\377' '\\x07' \
+                 '\\xff' '\\u12e4' '\\U00101234'  "
+            )
+            .unwrap()
+        );
+
+        assert_eq!(
+            Err(LexingError::MultipleCharactersInRune(Span::new("a", 2, 1))),
+            lex("'aa'")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "k", 2, 1
+            ))),
+            lex("'\\k'")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "'", 4, 1
+            ))),
+            lex("'\\xa'")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "'", 3, 1
+            ))),
+            lex("'\\0'")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "0", 4, 1
+            ))),
+            lex("'\\400'")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "F", 6, 1
+            ))),
+            lex("'\\uDFFF'")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "0", 10, 1
+            ))),
+            lex("'\\U00110000'")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "\"", 2, 1
+            ))),
+            lex("'\\\"'")
+        );
+        assert_eq!(
+            Err(LexingError::EmptyRune(Span::new("''", 0, 1))),
+            lex("''")
+        );
+        assert_eq!(Err(LexingError::UnclosedString), lex("'"));
+    }
+
+    #[test]
+    fn string_lits() {
+        macro_rules! s {
+            ($lit:expr) => {
+                $lit.to_owned()
+            };
+        }
+
+        assert_eq!(
+            vec![
+                Token::new(TokenKind::String(s!("abc")), Span::new("`abc`", 4, 1)),
+                Token::new(
+                    TokenKind::String(s!("\\n\n\\n")),
+                    Span::new("`\\n\n\\n`", 10, 1)
+                ),
+                Token::new(TokenKind::String(s!("\n")), Span::new("\"\\n\"", 18, 2)),
+                Token::new(TokenKind::String(s!("\"")), Span::new("\"\\\"\"", 23, 2)),
+                Token::new(TokenKind::SemiColon, Span::new("\n", 27, 2)),
+                Token::new(
+                    TokenKind::String(s!("Hello, world!\n")),
+                    Span::new("\"Hello, world!\\n\"", 29, 3)
+                ),
+                Token::new(
+                    TokenKind::String(s!("日本語")),
+                    Span::new("\"日本語\"", 47, 3)
+                ),
+                Token::new(
+                    TokenKind::String(s!("\u{65e5}本\u{008a9e}")),
+                    Span::new("\"\\u65e5本\\U00008a9e\"", 59, 3)
+                ),
+                Token::new(
+                    TokenKind::String(s!("\u{ff}\u{00FF}")),
+                    Span::new("\"\\xff\\u00FF\"", 81, 3)
+                ),
+                Token::new(TokenKind::String(s!("a\nb")), Span::new("`a\n\rb`", 94, 3)),
+                Token::new(TokenKind::String(s!("")), Span::new("\"\"", 101, 4)),
+                Token::new(TokenKind::String(s!("")), Span::new("``", 104, 4)),
+            ],
+            lex(
+                "  \t `abc` `\\n\n\\n` \"\\n\" \"\\\"\"\n \"Hello, world!\\n\" \"日本語\" \
+                 \"\\u65e5本\\U00008a9e\" \"\\xff\\u00FF\" `a\n\rb` \"\" ``  "
+            )
+            .unwrap()
+        );
+
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "0", 6, 1
+            ))),
+            lex("\"\\uD800\"")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "0", 10, 1
+            ))),
+            lex("\"\\U00110000\"")
+        );
+        assert_eq!(
+            Err(LexingError::LineBreakInString(Span::new("\n", 2, 1))),
+            lex("\"a\nb\"")
+        );
+        assert_eq!(
+            Err(LexingError::LineBreakInString(Span::new("\n", 2, 1))),
+            lex("\"a\nb\"")
+        );
+        assert_eq!(
+            Err(LexingError::InvalidStringEscapeSequence(Span::new(
+                "'", 2, 1
+            ))),
+            lex("\"\\'\"")
+        );
+        assert_eq!(Err(LexingError::UnclosedString), lex("\"aa"));
     }
 
     #[test]

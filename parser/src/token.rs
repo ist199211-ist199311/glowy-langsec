@@ -57,7 +57,9 @@ pub enum TokenKind {
     DoubleGtAssign, // >>=
     AmpCaretAssign, // &^=
 
-    Int(u64), // 3
+    Int(u64),       // 3
+    Rune(char),     // 'a'
+    String(String), // "hello world"
 
     Ident,
 
@@ -79,6 +81,8 @@ impl TokenKind {
             self,
             TokenKind::Ident
                 | TokenKind::Int(_)
+                | TokenKind::Rune(_)
+                | TokenKind::String(_)
                 | TokenKind::Return
                 | TokenKind::PlusPlus
                 | TokenKind::MinusMinus
