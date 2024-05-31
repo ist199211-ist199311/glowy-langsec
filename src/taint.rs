@@ -1,11 +1,11 @@
 use std::cmp::Ordering;
 
-use parser::{ast::*, Annotation};
+use parser::{ast::*, Annotation, Span};
 
 use crate::{
     context::{AnalysisContext, VisitFileContext},
     errors::AnalysisError,
-    labels::Label,
+    labels::{Label, LabelBacktrace, LabelBacktraceType},
     symbols::Symbol,
 };
 
@@ -54,25 +54,45 @@ fn visit_binding_decl_spec<'a>(
     annotation: &Option<Box<Annotation<'a>>>,
 ) {
     for (name, expr) in &node.mapping {
-        let mut label = visit_expr(context, expr);
+        let assignment_label_backtrace = visit_expr(context, expr);
+        let mut label = assignment_label_backtrace
+            .iter()
+            .fold(Label::Bottom, |acc, backtrace| acc.union(backtrace.label()));
+        let mut label_backtraces = vec![];
 
         if let Some(annotation) = annotation {
             match annotation.scope {
                 "label" => {
-                    label = label.union(&Label::from_parts(&annotation.labels));
+                    let annotation_label = Label::from_parts(&annotation.labels);
+                    label = label.union(&annotation_label);
+                    label_backtraces.push(LabelBacktrace::new_explicit_annotation(
+                        context.file(),
+                        name.clone(),
+                        annotation_label,
+                    ));
                 }
                 "sink" => {
                     let sink_label = Label::from_parts(&annotation.labels);
                     match label.partial_cmp(&sink_label) {
-                        None | Some(Ordering::Greater) => context.report_error(
-                            name.location(),
-                            AnalysisError::DataFlowAssignment {
-                                file: context.file(),
-                                symbol: name.clone(),
-                                sink_label,
-                                expression_label: label.clone(),
-                            },
-                        ),
+                        None | Some(Ordering::Greater) => {
+                            let label_backtrace = LabelBacktrace::new(
+                                LabelBacktraceType::Assignment,
+                                context.file(),
+                                name.clone(),
+                                label.clone(),
+                                label_backtraces
+                                    .iter()
+                                    .chain(assignment_label_backtrace.iter()),
+                            );
+                            context.report_error(
+                                name.location(),
+                                AnalysisError::DataFlowAssignment {
+                                    sink_label,
+                                    label_backtrace: label_backtrace
+                                        .expect("label of assignment to not be bottom"),
+                                },
+                            )
+                        }
                         _ => {}
                     }
                 }
@@ -80,11 +100,19 @@ fn visit_binding_decl_spec<'a>(
             }
         }
 
-        if let Some(prev_symbol) = context.symbol_table.create_symbol(Symbol::new_with_package(
-            context.current_package(),
+        let label_backtrace = LabelBacktrace::new(
+            LabelBacktraceType::Assignment,
+            context.file(),
             name.clone(),
             label,
-        )) {
+            label_backtraces
+                .iter()
+                .chain(assignment_label_backtrace.iter()),
+        );
+
+        let new_symbol =
+            Symbol::new_with_package(context.current_package(), name.clone(), label_backtrace);
+        if let Some(prev_symbol) = context.symbol_table.create_symbol(new_symbol) {
             context.report_error(
                 name.location(),
                 AnalysisError::Redeclaration {
@@ -105,7 +133,7 @@ fn visit_function_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &Functi
             if let Some(prev_symbol) = context.symbol_table.create_symbol(Symbol::new_with_package(
                 context.current_package(),
                 id.clone(),
-                Label::Bottom, // TODO: make label depend on calls to function
+                None, // TODO: make label depend on calls to function
             )) {
                 context.report_error(
                     id.location(),
@@ -146,10 +174,29 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
     }
 }
 
-fn visit_expr<'a>(context: &mut VisitFileContext<'a, '_>, node: &ExprNode<'a>) -> Label<'a> {
+fn visit_expr<'a>(
+    context: &mut VisitFileContext<'a, '_>,
+    node: &ExprNode<'a>,
+) -> Vec<LabelBacktrace<'a>> {
     match node {
-        ExprNode::Name(name) => match context.symtab().get_symbol_label(name.id.content()) {
-            Some(label) => label.clone(),
+        ExprNode::Name(name) => match context
+            .symtab()
+            .get_symbol_label_backtrace(name.id.content())
+        {
+            Some(label_backtrace) => label_backtrace
+                .as_ref()
+                .map(|backtrace| {
+                    LabelBacktrace::new(
+                        LabelBacktraceType::Expression,
+                        context.file(),
+                        name.id.clone(),
+                        backtrace.label().clone(),
+                        std::iter::once(backtrace),
+                    )
+                })
+                .into_iter()
+                .flatten()
+                .collect(),
             None => {
                 context.report_error(
                     name.id.location(),
@@ -158,43 +205,78 @@ fn visit_expr<'a>(context: &mut VisitFileContext<'a, '_>, node: &ExprNode<'a>) -
                         symbol: name.id.clone(),
                     },
                 );
-                Label::Bottom
+                vec![]
             }
         },
-        ExprNode::Literal(_) => Label::Bottom,
+        ExprNode::Literal(_) => vec![],
         ExprNode::UnaryOp { operand, .. } => visit_expr(context, operand.as_ref()),
         ExprNode::BinaryOp { left, right, .. } => {
-            let llabel = visit_expr(context, left.as_ref());
+            let mut llabel = visit_expr(context, left.as_ref());
             let rlabel = visit_expr(context, right.as_ref());
-            llabel.union(&rlabel)
+            llabel.extend(rlabel);
+            llabel
         }
         ExprNode::Call(call_node) => visit_call(context, call_node),
         ExprNode::Indexing(_) => todo!(),
     }
 }
 
-fn visit_call<'a>(context: &mut VisitFileContext<'a, '_>, node: &CallNode<'a>) -> Label<'a> {
-    // TODO: use `node.func` to more accurately determine label
-
+fn visit_call<'a>(
+    context: &mut VisitFileContext<'a, '_>,
+    node: &CallNode<'a>,
+) -> Vec<LabelBacktrace<'a>> {
     let mut label = Label::Bottom;
-    for arg in &node.args {
-        let arg_label = visit_expr(context, arg);
+    let label_backtraces: Vec<_> = node
+        .args
+        .iter()
+        .flat_map(|arg| visit_expr(context, arg))
+        .inspect(|backtrace| label = label.union(backtrace.label()))
+        .collect();
 
-        if let Some(annotation) = &node.annotation {
-            if annotation.scope == "sink" {
+    // TODO handle this properly by providing a span for expressions in the parser
+    let symbol = find_first_ident(&node.func)
+        .expect("glowy currently only supports calling functions by their identifiers");
+    let label_backtrace = LabelBacktrace::new(
+        LabelBacktraceType::FunctionCall,
+        context.file(),
+        symbol.clone(),
+        label.clone(),
+        &label_backtraces,
+    );
+
+    if let Some(annotation) = &node.annotation {
+        match annotation.scope {
+            "sink" => {
                 let sink_label = Label::from_parts(&annotation.labels);
-                match arg_label.partial_cmp(&sink_label) {
-                    None | Some(Ordering::Greater) => {
-                        // TODO: FIXME: parser does not have a way to get the location of args
-                        context.report_error(0..0, AnalysisError::DataFlowFuncCall)
-                    }
+                match label.partial_cmp(&sink_label) {
+                    None | Some(Ordering::Greater) => context.report_error(
+                        symbol.location(),
+                        AnalysisError::DataFlowFuncCall {
+                            sink_label,
+                            label_backtrace: label_backtrace
+                                .clone()
+                                .expect("label of function call to not be bottom"),
+                        },
+                    ),
                     _ => {}
                 }
             }
+            _ => {}
         }
-
-        label = label.union(&arg_label);
     }
 
-    label
+    label_backtrace.into_iter().collect()
+}
+
+fn find_first_ident<'a>(node: &ExprNode<'a>) -> Option<Span<'a>> {
+    match node {
+        ExprNode::Name(name) => Some(name.id.clone()),
+        ExprNode::Literal(_) => None,
+        ExprNode::Call(call_node) => find_first_ident(&call_node.func),
+        ExprNode::Indexing(indexing_node) => find_first_ident(&indexing_node.expr),
+        ExprNode::UnaryOp { operand, .. } => find_first_ident(operand),
+        ExprNode::BinaryOp { left, right, .. } => {
+            find_first_ident(left).or_else(|| find_first_ident(right))
+        }
+    }
 }

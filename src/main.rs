@@ -8,7 +8,11 @@ use codespan_reporting::{
         termcolor::{ColorChoice, StandardStream},
     },
 };
-use glowy::{analyze_files, errors::AnalysisError};
+use glowy::{
+    analyze_files,
+    errors::AnalysisError,
+    labels::{LabelBacktrace, LabelBacktraceType},
+};
 use parser::Diagnostics;
 
 fn main() {
@@ -81,27 +85,58 @@ fn get_diagnostic_for_error<'a>(
                 .to_owned()])
         }
         AnalysisError::DataFlowAssignment {
-            file,
-            symbol,
             sink_label,
-            expression_label,
+            label_backtrace,
         } => {
+            dbg!(&label_backtrace);
             Diagnostic::error()
                 .with_code("E001")
                 .with_message(s!("insecure data flow to sink during assigment"))
-                .with_labels(vec![
-                    Label::primary(file, symbol.location()).with_message(format!(
-                        "sink `{}` has label {}, but the expression being assigned to it has \
-                         label {}",
-                        symbol.content(),
-                        sink_label,
-                        expression_label
-                    )),
-                    // TODO: when the error supports it, show where the labels of the expression
-                    // come from
-                ])
+                .with_labels(
+                    std::iter::once(
+                        Label::primary(label_backtrace.file(), label_backtrace.symbol().location())
+                            .with_message(format!(
+                                "sink `{}` has label {}, but the expression being assigned to it \
+                                 has label {}",
+                                label_backtrace.symbol().content(),
+                                sink_label,
+                                label_backtrace.label(),
+                            )),
+                    )
+                    .chain(
+                        label_backtrace
+                            .children()
+                            .iter()
+                            .flat_map(flatten_label_backtrace),
+                    )
+                    .collect(),
+                )
         }
-        AnalysisError::DataFlowFuncCall => todo!(),
+        AnalysisError::DataFlowFuncCall {
+            sink_label,
+            label_backtrace,
+        } => Diagnostic::error()
+            .with_code("E002")
+            .with_message(s!("insecure data flow to sink during function call"))
+            .with_labels(
+                std::iter::once(
+                    Label::primary(label_backtrace.file(), label_backtrace.symbol().location())
+                        .with_message(format!(
+                            "sink `{}` has label {}, but the arguments in the function call have \
+                             label {}",
+                            label_backtrace.symbol().content(),
+                            sink_label,
+                            label_backtrace.label(),
+                        )),
+                )
+                .chain(
+                    label_backtrace
+                        .children()
+                        .iter()
+                        .flat_map(flatten_label_backtrace),
+                )
+                .collect(),
+            ),
         AnalysisError::UnknownSymbol { file, symbol } => Diagnostic::warning()
             .with_code("W001")
             .with_message(s!("symbol not found"))
@@ -131,4 +166,47 @@ fn get_diagnostic_for_error<'a>(
             )
             .to_owned()]),
     }
+}
+
+fn flatten_label_backtrace(label_backtrace: &LabelBacktrace) -> Vec<Label<usize>> {
+    let label = Label::secondary(label_backtrace.file(), label_backtrace.symbol().location())
+        .with_message(match label_backtrace.r#type() {
+            LabelBacktraceType::ExplicitAnnotation => format!(
+                "symbol `{}` has been explicitly annotated with label {}",
+                label_backtrace.symbol().content(),
+                label_backtrace.label()
+            ),
+            LabelBacktraceType::Assignment => format!(
+                "symbol `{}` has been assigned a value that has label {}",
+                label_backtrace.symbol().content(),
+                label_backtrace.label()
+            ),
+            LabelBacktraceType::Expression => format!(
+                "symbol `{}` in expression has label {}",
+                label_backtrace.symbol().content(),
+                label_backtrace.label()
+            ),
+            LabelBacktraceType::Branch => format!(
+                "symbol `{}` in branch has label {}",
+                label_backtrace.symbol().content(),
+                label_backtrace.label()
+            ),
+            LabelBacktraceType::Return => {
+                format!("function returns with label {}", label_backtrace.label())
+            }
+            LabelBacktraceType::FunctionCall => format!(
+                "function call to `{}` has return value with label {}",
+                label_backtrace.symbol().content(),
+                label_backtrace.label()
+            ),
+        });
+
+    std::iter::once(label)
+        .chain(
+            label_backtrace
+                .children()
+                .iter()
+                .flat_map(|child| flatten_label_backtrace(child)),
+        )
+        .collect()
 }

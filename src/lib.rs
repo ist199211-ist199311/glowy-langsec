@@ -1,10 +1,11 @@
 use errors::AnalysisError;
+use labels::{Label, LabelBacktrace};
 
 use crate::{context::AnalysisContext, taint::visit_source_file};
 
 mod context;
 pub mod errors;
-mod labels;
+pub mod labels;
 mod symbols;
 mod taint;
 

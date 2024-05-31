@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use parser::Span;
 
-use crate::labels::Label;
+use crate::labels::{Label, LabelBacktrace};
 
 pub type SymbolScope<'a> = HashMap<&'a str, Symbol<'a>>;
 
@@ -39,7 +39,10 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
         scope.insert(symbol.name.content(), symbol)
     }
 
-    pub fn get_symbol_label<'c>(&'c self, symbol_name: &str) -> Option<&'c Label<'a>> {
+    pub fn get_symbol_label_backtrace<'c>(
+        &'c self,
+        symbol_name: &str,
+    ) -> Option<&'c Option<LabelBacktrace<'a>>> {
         self.scopes
             .iter()
             .rev()
@@ -48,7 +51,7 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
                 self.parent_scope
                     .and_then(|context| context.get(symbol_name))
             })
-            .map(|symbol| &symbol.label)
+            .map(|symbol| &symbol.label_backtrace)
     }
 
     pub fn get_topmost_scope(self) -> SymbolScope<'a> {
@@ -74,25 +77,19 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
 pub struct Symbol<'a> {
     package: Option<&'a str>, // for qualified operand names
     name: Span<'a>,
-    label: Label<'a>,
+    label_backtrace: Option<LabelBacktrace<'a>>,
 }
 
 impl<'a> Symbol<'a> {
-    pub fn new_with_package(package: &'a str, name: Span<'a>, label: Label<'a>) -> Symbol<'a> {
+    pub fn new_with_package(
+        package: &'a str,
+        name: Span<'a>,
+        label_backtrace: Option<LabelBacktrace<'a>>,
+    ) -> Symbol<'a> {
         Symbol {
             package: Some(package),
             name,
-            label,
-        }
-    }
-
-    // TODO needed?
-    #[allow(dead_code)]
-    pub fn new(name: Span<'a>, label: Label<'a>) -> Symbol<'a> {
-        Symbol {
-            package: None,
-            name,
-            label,
+            label_backtrace,
         }
     }
 

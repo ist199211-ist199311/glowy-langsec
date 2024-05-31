@@ -1,4 +1,6 @@
-use std::{cmp::Ordering, collections::BTreeSet, fmt::Display, ops::BitOr};
+use std::{backtrace, cmp::Ordering, collections::BTreeSet, fmt::Display, ops::BitOr};
+
+use parser::Span;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Label<'a> {
@@ -18,7 +20,6 @@ impl<'a> Label<'a> {
         }
     }
 
-    // TODO support saying if changed?
     pub fn union(&self, other: &Label<'a>) -> Label<'a> {
         match (self, other) {
             (Self::Top, _) => Self::Top,
@@ -27,6 +28,29 @@ impl<'a> Label<'a> {
             (Self::Bottom, Self::Parts(_)) => other.clone(),
             (Self::Parts(lparts), Self::Parts(rparts)) => Self::Parts(lparts | rparts),
             (Self::Bottom, Self::Bottom) => Self::Bottom,
+        }
+    }
+
+    pub fn intersect(&self, other: &Label<'a>) -> Label<'a> {
+        match (self, other) {
+            (Self::Top, _) => other.clone(),
+            (_, Self::Top) => self.clone(),
+            (Self::Parts(_), Self::Bottom) => Self::Bottom,
+            (Self::Bottom, Self::Parts(_)) => Self::Bottom,
+            (Self::Parts(lparts), Self::Parts(rparts)) => Self::Parts(lparts & rparts),
+            (Self::Bottom, Self::Bottom) => Self::Bottom,
+        }
+    }
+
+    pub fn difference(&self, other: &Label<'a>) -> Label<'a> {
+        match (self, other) {
+            (_, Self::Top) => Self::Bottom,
+            (Self::Top, _) => Self::Top,
+            (Self::Parts(_), Self::Bottom) => self.clone(),
+            (Self::Parts(lparts), Self::Parts(rparts)) => {
+                Self::Parts(lparts.difference(rparts).cloned().collect())
+            }
+            (Self::Bottom, _) => Self::Bottom,
         }
     }
 }
@@ -74,6 +98,136 @@ impl<'a> Display for Label<'a> {
     }
 }
 
+/// Keeps track of where labels come from.
+/// This represents a tree, where each node has children indicating where
+/// the labels come from.
+/// The following assumptions are strictly enforced:
+/// - Two distinct children cannot share any label;
+/// - Labels of children are always a subset of their parent's label.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LabelBacktrace<'a> {
+    r#type: LabelBacktraceType,
+    file_id: usize,
+    symbol: Span<'a>,
+    label: Label<'a>,
+    children: Vec<LabelBacktrace<'a>>,
+}
+
+impl<'a> LabelBacktrace<'a> {
+    pub fn new_explicit_annotation(file_id: usize, symbol: Span<'a>, label: Label<'a>) -> Self {
+        Self {
+            r#type: LabelBacktraceType::ExplicitAnnotation,
+            file_id,
+            symbol,
+            label,
+            children: vec![],
+        }
+    }
+
+    pub fn new<'b>(
+        r#type: LabelBacktraceType,
+        file_id: usize,
+        symbol: Span<'a>,
+        label: Label<'a>,
+        children: impl IntoIterator<Item = &'b LabelBacktrace<'a>>,
+    ) -> Option<Self>
+    where
+        'a: 'b,
+    {
+        let children: Vec<_> = match label {
+            Label::Bottom => return None,
+            Label::Top => children
+                .into_iter()
+                .find(|child| child.label() == &Label::Top)
+                .into_iter()
+                .cloned()
+                .collect(),
+            Label::Parts(_) => {
+                let mut remaining_label = label.clone();
+                children
+                    .into_iter()
+                    .filter_map(|child| {
+                        let child = Self::restrict_to_label(&remaining_label, child);
+                        if let Some(child) = &child {
+                            remaining_label = remaining_label.difference(child.label());
+                        }
+                        child
+                    })
+                    .collect()
+            }
+        };
+
+        if children.len() == 1
+            && children.first().unwrap().label() == &label
+            && children.first().unwrap().symbol() == &symbol
+        {
+            // avoid multiple repeated backtraces to the same symbol
+            children.first().cloned()
+        } else {
+            Some(LabelBacktrace {
+                r#type,
+                file_id,
+                symbol,
+                label,
+                children,
+            })
+        }
+    }
+
+    /// Ensure this LabelBacktrace only mentions the provided label,
+    /// pruning children if they have label bottom.
+    fn restrict_to_label(
+        label: &Label<'a>,
+        backtrace: &LabelBacktrace<'a>,
+    ) -> Option<LabelBacktrace<'a>> {
+        let new_label = label.intersect(backtrace.label());
+        match new_label {
+            Label::Bottom => None,
+            new_label => Some(Self {
+                r#type: backtrace.r#type,
+                file_id: backtrace.file_id,
+                symbol: backtrace.symbol.clone(),
+                label: new_label,
+                children: backtrace
+                    .children
+                    .iter()
+                    .filter_map(|child| Self::restrict_to_label(label, child))
+                    .collect(),
+            }),
+        }
+    }
+
+    pub fn label(&self) -> &Label<'a> {
+        &self.label
+    }
+
+    pub fn symbol(&self) -> &Span<'a> {
+        &self.symbol
+    }
+
+    pub fn file(&self) -> usize {
+        self.file_id
+    }
+
+    pub fn r#type(&self) -> LabelBacktraceType {
+        self.r#type
+    }
+
+    pub fn children(&self) -> &[LabelBacktrace<'a>] {
+        &self.children
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelBacktraceType {
+    ExplicitAnnotation,
+    Assignment,
+    Expression,
+    Branch,
+    FunctionCall,
+    Return,
+}
+
 #[cfg(test)]
 mod tests {
     use std::{cmp::Ordering, collections::BTreeSet};
@@ -114,6 +268,71 @@ mod tests {
         );
 
         union!(Label::Bottom, Label::Bottom, Label::Bottom);
+    }
+
+    #[test]
+    fn label_intersect() {
+        macro_rules! intersect {
+            ($left: expr, $right: expr, $expected: expr) => {
+                assert_eq!($left.intersect(&$right), $expected);
+                assert_eq!($right.intersect(&$left), $expected);
+            };
+        }
+
+        intersect!(Label::Top, Label::Top, Label::Top);
+        intersect!(
+            Label::Top,
+            Label::from_parts(&["lbl1"]),
+            Label::from_parts(&["lbl1"])
+        );
+        intersect!(Label::Top, Label::Bottom, Label::Bottom);
+
+        intersect!(
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::from_parts(&["lbl2", "lbl3"]),
+            Label::from_parts(&["lbl3"])
+        );
+        intersect!(
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::Bottom,
+            Label::Bottom
+        );
+
+        intersect!(Label::Bottom, Label::Bottom, Label::Bottom);
+    }
+
+    #[test]
+    fn label_difference() {
+        macro_rules! difference {
+            ($left: expr, $right: expr, $expected_lr: expr, $expected_rl: expr) => {
+                assert_eq!($left.difference(&$right), $expected_lr);
+                assert_eq!($right.difference(&$left), $expected_rl);
+            };
+        }
+
+        difference!(Label::Top, Label::Top, Label::Bottom, Label::Bottom);
+        difference!(
+            Label::Top,
+            Label::from_parts(&["lbl1"]),
+            Label::Top,
+            Label::Bottom
+        );
+        difference!(Label::Top, Label::Bottom, Label::Top, Label::Bottom);
+
+        difference!(
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::from_parts(&["lbl2", "lbl3"]),
+            Label::from_parts(&["lbl1"]),
+            Label::from_parts(&["lbl2"])
+        );
+        difference!(
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::Bottom,
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::Bottom
+        );
+
+        difference!(Label::Bottom, Label::Bottom, Label::Bottom, Label::Bottom);
     }
 
     #[test]
