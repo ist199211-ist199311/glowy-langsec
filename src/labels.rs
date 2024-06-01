@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, collections::BTreeSet, fmt::Display};
 
-use parser::Span;
+use parser::{Location, Span};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Label<'a> {
@@ -108,7 +108,8 @@ impl<'a> Display for Label<'a> {
 pub struct LabelBacktrace<'a> {
     r#type: LabelBacktraceType,
     file_id: usize,
-    symbol: Span<'a>,
+    location: Location,
+    symbol: Option<Span<'a>>,
     label: Label<'a>,
     children: Vec<LabelBacktrace<'a>>,
 }
@@ -118,7 +119,8 @@ impl<'a> LabelBacktrace<'a> {
         Self {
             r#type: LabelBacktraceType::ExplicitAnnotation,
             file_id,
-            symbol,
+            location: symbol.location(),
+            symbol: Some(symbol),
             label,
             children: vec![],
         }
@@ -127,7 +129,8 @@ impl<'a> LabelBacktrace<'a> {
     pub fn new<'b>(
         r#type: LabelBacktraceType,
         file_id: usize,
-        symbol: Span<'a>,
+        location: Location,
+        symbol: Option<Span<'a>>,
         label: Label<'a>,
         children: impl IntoIterator<Item = &'b LabelBacktrace<'a>>,
     ) -> Option<Self>
@@ -147,7 +150,7 @@ impl<'a> LabelBacktrace<'a> {
                 children
                     .into_iter()
                     .filter_map(|child| {
-                        let child = Self::restrict_to_label(&remaining_label, child);
+                        let child = child.restrict_to_label(&remaining_label);
                         if let Some(child) = &child {
                             remaining_label = remaining_label.difference(child.label());
                         }
@@ -157,53 +160,90 @@ impl<'a> LabelBacktrace<'a> {
             }
         };
 
-        if children.len() == 1
-            && children.first().unwrap().label() == &label
-            && children.first().unwrap().symbol() == &symbol
-        {
-            // avoid multiple repeated backtraces to the same symbol
-            children.first().cloned()
-        } else {
-            Some(LabelBacktrace {
-                r#type,
-                file_id,
-                symbol,
-                label,
-                children,
-            })
-        }
+        // if there is only one child
+        if let [child] = children.as_slice() {
+            if child.label == label
+                && child.r#type == r#type
+                && child.location == location
+                && child.symbol == symbol
+            {
+                // avoid multiple repeated backtraces to the same symbol
+                return Some(child.clone());
+            }
+        };
+
+        Some(LabelBacktrace {
+            r#type,
+            file_id,
+            location,
+            symbol,
+            label,
+            children,
+        })
     }
 
     /// Ensure this LabelBacktrace only mentions the provided label,
     /// pruning children if they have label bottom.
-    fn restrict_to_label(
-        label: &Label<'a>,
-        backtrace: &LabelBacktrace<'a>,
-    ) -> Option<LabelBacktrace<'a>> {
-        let new_label = label.intersect(backtrace.label());
+    fn restrict_to_label(&self, label: &Label<'a>) -> Option<LabelBacktrace<'a>> {
+        let new_label = self.label.intersect(label);
 
         if new_label == Label::Bottom {
             None
         } else {
             Some(Self {
-                r#type: backtrace.r#type,
-                file_id: backtrace.file_id,
-                symbol: backtrace.symbol.clone(),
+                r#type: self.r#type,
+                file_id: self.file_id,
+                location: self.location.clone(),
+                symbol: self.symbol.clone(),
                 label: new_label,
-                children: backtrace
+                children: self
                     .children
                     .iter()
-                    .filter_map(|child| Self::restrict_to_label(label, child))
+                    .filter_map(|child| child.restrict_to_label(label))
                     .collect(),
             })
         }
+    }
+
+    pub fn with_child(&self, child: &LabelBacktrace<'a>) -> LabelBacktrace<'a> {
+        Self::new(
+            self.r#type,
+            self.file_id,
+            self.location.clone(),
+            self.symbol.clone(),
+            self.label.union(child.label()),
+            std::iter::once(child).chain(self.children.iter()),
+        )
+        .unwrap() // safe because if self exists, label is not Bottom
+    }
+
+    pub fn union(
+        &self,
+        other: &LabelBacktrace<'a>,
+        with_type: LabelBacktraceType,
+        at_location: Location,
+        symbol: Option<Span<'a>>,
+    ) -> LabelBacktrace<'a> {
+        Self::new(
+            with_type,
+            self.file_id, // FIXME: this is not necessarily true...
+            at_location,
+            symbol,
+            self.label.union(other.label()),
+            [self, other],
+        )
+        .unwrap() // safe because if self exists, label is not Bottom
     }
 
     pub fn label(&self) -> &Label<'a> {
         &self.label
     }
 
-    pub fn symbol(&self) -> &Span<'a> {
+    pub fn location(&self) -> &Location {
+        &self.location
+    }
+
+    pub fn symbol(&self) -> &Option<Span<'a>> {
         &self.symbol
     }
 

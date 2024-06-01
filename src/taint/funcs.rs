@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use parser::ast::{CallNode, ExprNode, FunctionDeclNode};
 
-use super::{exprs::find_first_ident, visit_expr, visit_statement};
+use super::{exprs::visit_expr, visit_statement};
 use crate::{
     context::VisitFileContext,
     errors::{AnalysisError, InsecureFlowKind},
@@ -45,7 +45,7 @@ pub fn visit_function_decl<'a>(
 pub fn visit_call<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &CallNode<'a>,
-) -> Vec<LabelBacktrace<'a>> {
+) -> Option<LabelBacktrace<'a>> {
     let mut label = Label::Bottom;
     let args_backtraces: Vec<_> = node
         .args
@@ -54,13 +54,11 @@ pub fn visit_call<'a>(
         .inspect(|backtrace| label = label.union(backtrace.label()))
         .collect();
 
-    // TODO handle this properly by providing a span for expressions in the parser
-    let symbol = find_first_ident(&node.func)
-        .expect("Glowy currently only supports calling functions by their identifiers");
     let backtrace = LabelBacktrace::new(
         LabelBacktraceType::FunctionCall,
         context.file(),
-        symbol.clone(),
+        node.location.clone(),
+        None,
         label.clone(),
         &args_backtraces,
     );
@@ -71,7 +69,7 @@ pub fn visit_call<'a>(
 
             if let None | Some(Ordering::Greater) = label.partial_cmp(&sink_label) {
                 context.report_error(
-                    symbol.location(),
+                    node.location.clone(),
                     AnalysisError::InsecureFlow {
                         kind: InsecureFlowKind::Call,
                         sink_label,
@@ -86,7 +84,7 @@ pub fn visit_call<'a>(
         }
     }
 
-    backtrace.into_iter().collect()
+    backtrace
 }
 
 pub fn visit_return<'a>(context: &mut VisitFileContext<'a, '_>, exprs: &[ExprNode<'a>]) {

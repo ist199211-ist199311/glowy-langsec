@@ -93,10 +93,9 @@ fn get_diagnostic_for_error<'a>(
             .with_message(format!("insecure data flow to sink in {}", kind.context()))
             .with_labels(
                 std::iter::once(
-                    Label::primary(backtrace.file(), backtrace.symbol().location()).with_message(
+                    Label::primary(backtrace.file(), backtrace.location().clone()).with_message(
                         format!(
-                            "sink `{}` has label {}, but {} has label {}",
-                            backtrace.symbol().content(),
+                            "sink has label {}, but {} has label {}",
                             sink_label,
                             kind.operand(),
                             backtrace.label(),
@@ -142,42 +141,48 @@ fn get_diagnostic_for_error<'a>(
     }
 }
 
-fn flatten_label_backtrace(label_backtrace: &LabelBacktrace) -> Vec<Label<usize>> {
-    let label = Label::secondary(label_backtrace.file(), label_backtrace.symbol().location())
-        .with_message(match label_backtrace.r#type() {
+fn flatten_label_backtrace(backtrace: &LabelBacktrace) -> Vec<Label<usize>> {
+    fn symbol(backtrace: &LabelBacktrace, default: &str) -> String {
+        if let Some(span) = backtrace.symbol() {
+            format!("symbol `{}`", span.content())
+        } else {
+            default.to_owned()
+        }
+    }
+
+    let label = Label::secondary(backtrace.file(), backtrace.location().clone()).with_message(
+        match backtrace.r#type() {
             LabelBacktraceType::ExplicitAnnotation => format!(
-                "symbol `{}` has been explicitly annotated with label {}",
-                label_backtrace.symbol().content(),
-                label_backtrace.label()
+                "{} has been explicitly annotated with label {}",
+                symbol(backtrace, "symbol"),
+                backtrace.label()
             ),
             LabelBacktraceType::Assignment => format!(
-                "symbol `{}` has been assigned a value that has label {}",
-                label_backtrace.symbol().content(),
-                label_backtrace.label()
+                "{} has been assigned a value that has label {}",
+                symbol(backtrace, "symbol"),
+                backtrace.label()
             ),
             LabelBacktraceType::Expression => format!(
-                "symbol `{}` in expression has label {}",
-                label_backtrace.symbol().content(),
-                label_backtrace.label()
+                "{} has label {}",
+                symbol(backtrace, "expression"),
+                backtrace.label()
             ),
-            LabelBacktraceType::Branch => format!(
-                "symbol `{}` in branch has label {}",
-                label_backtrace.symbol().content(),
-                label_backtrace.label()
-            ),
+            LabelBacktraceType::Branch => {
+                format!("execution branch has label {}", backtrace.label())
+            }
             LabelBacktraceType::Return => {
-                format!("function returns with label {}", label_backtrace.label())
+                format!("function returns with label {}", backtrace.label())
             }
             LabelBacktraceType::FunctionCall => format!(
-                "function call to `{}` has return value with label {}",
-                label_backtrace.symbol().content(),
-                label_backtrace.label()
+                "function call has return value with label {}",
+                backtrace.label()
             ),
-        });
+        },
+    );
 
     std::iter::once(label)
         .chain(
-            label_backtrace
+            backtrace
                 .children()
                 .iter()
                 .flat_map(|child| flatten_label_backtrace(child)),

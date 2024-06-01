@@ -5,7 +5,7 @@ use parser::{
     Annotation,
 };
 
-use super::visit_expr;
+use super::exprs::{find_expr_location, visit_expr};
 use crate::{
     context::VisitFileContext,
     errors::{AnalysisError, InsecureFlowKind},
@@ -21,8 +21,10 @@ pub fn visit_binding_decl_spec<'a>(
     for (name, expr) in &node.mapping {
         let expr_backtrace = visit_expr(context, expr);
         let mut label = expr_backtrace
-            .iter()
-            .fold(Label::Bottom, |acc, backtrace| acc.union(backtrace.label()));
+            .as_ref()
+            .map(LabelBacktrace::label)
+            .cloned()
+            .unwrap_or(Label::Bottom);
         let mut backtraces = vec![];
 
         if let Some(annotation) = annotation {
@@ -43,7 +45,8 @@ pub fn visit_binding_decl_spec<'a>(
                         let backtrace = LabelBacktrace::new(
                             LabelBacktraceType::Assignment,
                             context.file(),
-                            name.clone(),
+                            find_expr_location(expr).unwrap(), // guaranteed Some
+                            None,
                             label.clone(),
                             backtraces.iter().chain(expr_backtrace.iter()),
                         )
@@ -66,7 +69,8 @@ pub fn visit_binding_decl_spec<'a>(
         let backtrace = LabelBacktrace::new(
             LabelBacktraceType::Assignment,
             context.file(),
-            name.clone(),
+            name.location(),
+            Some(name.clone()),
             label,
             backtraces.iter().chain(expr_backtrace.iter()),
         );

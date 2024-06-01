@@ -1,6 +1,6 @@
 use parser::{
-    ast::{ExprNode, IndexingNode},
-    Span,
+    ast::{CallNode, ExprNode, IndexingNode, OperandNameNode},
+    Location,
 };
 
 use super::funcs::visit_call;
@@ -13,27 +13,24 @@ use crate::{
 pub fn visit_expr<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &ExprNode<'a>,
-) -> Vec<LabelBacktrace<'a>> {
+) -> Option<LabelBacktrace<'a>> {
     match node {
-        ExprNode::Name(name) => match context
-            .symtab()
-            .get_symbol_label_backtrace(name.id.content())
-        {
-            Some(label_backtrace) => label_backtrace
-                .as_ref()
-                .map(|backtrace| {
+        ExprNode::Name(name) => {
+            let symbol = context.symtab().get_symbol(name.id.content());
+
+            if let Some(symbol) = symbol {
+                symbol.backtrace().as_ref().map(|symbol_backtrace| {
                     LabelBacktrace::new(
                         LabelBacktraceType::Expression,
                         context.file(),
-                        name.id.clone(),
-                        backtrace.label().clone(),
-                        std::iter::once(backtrace),
+                        name.id.location(),
+                        Some(name.id.clone()),
+                        symbol_backtrace.label().clone(),
+                        std::iter::once(symbol_backtrace),
                     )
+                    .unwrap() // safe since we know backtrace exists
                 })
-                .into_iter()
-                .flatten()
-                .collect(),
-            None => {
+            } else {
                 context.report_error(
                     name.id.location(),
                     AnalysisError::UnknownSymbol {
@@ -41,38 +38,51 @@ pub fn visit_expr<'a>(
                         symbol: name.id.clone(),
                     },
                 );
-                vec![]
+
+                None
             }
-        },
-        ExprNode::Literal(_) => vec![],
+        }
+        ExprNode::Literal(_) => None,
         ExprNode::UnaryOp { operand, .. } => visit_expr(context, operand.as_ref()),
-        ExprNode::BinaryOp { left, right, .. } => {
-            let mut llabel = visit_expr(context, left.as_ref());
-            let rlabel = visit_expr(context, right.as_ref());
-            llabel.extend(rlabel);
-            llabel
+        ExprNode::BinaryOp {
+            left,
+            right,
+            location,
+            ..
+        } => {
+            let left = visit_expr(context, left.as_ref());
+            let right = visit_expr(context, right.as_ref());
+
+            match (&left, &right) {
+                (None, None) => None,
+                (Some(_), None) => left,
+                (None, Some(_)) => right,
+                (Some(l), Some(r)) => {
+                    Some(l.union(r, LabelBacktraceType::Expression, location.clone(), None))
+                }
+            }
         }
         ExprNode::Call(call) => visit_call(context, call),
         ExprNode::Indexing(indexing) => visit_indexing(context, indexing),
     }
 }
 
-fn visit_indexing<'a>(
+pub fn visit_indexing<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &IndexingNode<'a>,
-) -> Vec<LabelBacktrace<'a>> {
+) -> Option<LabelBacktrace<'a>> {
     todo!()
 }
 
-pub fn find_first_ident<'a>(node: &ExprNode<'a>) -> Option<Span<'a>> {
-    match node {
-        ExprNode::Name(name) => Some(name.id.clone()),
-        ExprNode::Literal(_) => None,
-        ExprNode::Call(call_node) => find_first_ident(&call_node.func),
-        ExprNode::Indexing(indexing_node) => find_first_ident(&indexing_node.expr),
-        ExprNode::UnaryOp { operand, .. } => find_first_ident(operand),
-        ExprNode::BinaryOp { left, right, .. } => {
-            find_first_ident(left).or_else(|| find_first_ident(right))
-        }
-    }
+pub fn find_expr_location<'a>(node: &ExprNode<'a>) -> Option<Location> {
+    let loc = match node {
+        ExprNode::Name(OperandNameNode { id, .. }) => id.location(),
+        ExprNode::Literal(_) => return None,
+        ExprNode::Call(CallNode { location, .. }) => location.clone(),
+        ExprNode::Indexing(IndexingNode { location, .. }) => location.clone(),
+        ExprNode::UnaryOp { location, .. } => location.clone(),
+        ExprNode::BinaryOp { location, .. } => location.clone(),
+    };
+
+    Some(loc)
 }

@@ -39,10 +39,7 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
         scope.insert(symbol.name.content(), symbol)
     }
 
-    pub fn get_symbol_label_backtrace<'c>(
-        &'c self,
-        symbol_name: &str,
-    ) -> Option<&'c Option<LabelBacktrace<'a>>> {
+    pub fn get_symbol<'c>(&'c self, symbol_name: &str) -> Option<&'c Symbol<'a>> {
         self.scopes
             .iter()
             .rev()
@@ -51,7 +48,6 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
                 self.parent_scope
                     .and_then(|context| context.get(symbol_name))
             })
-            .map(|symbol| &symbol.label_backtrace)
     }
 
     pub fn get_topmost_scope(self) -> SymbolScope<'a> {
@@ -93,7 +89,15 @@ impl<'a> Symbol<'a> {
         }
     }
 
+    pub fn package(&self) -> &Option<&'a str> {
+        &self.package
+    }
+
     pub fn name(&self) -> &Span<'a> {
         &self.name
+    }
+
+    pub fn backtrace(&self) -> &Option<LabelBacktrace<'a>> {
+        &self.label_backtrace
     }
 }

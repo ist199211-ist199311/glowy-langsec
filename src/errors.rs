@@ -65,7 +65,7 @@ impl InsecureFlowKind {
     pub fn operand(&self) -> &'static str {
         match self {
             Self::Assignment => "the expression being assigned",
-            Self::Call => "an argument being passed",
+            Self::Call => "an argument",
         }
     }
 }

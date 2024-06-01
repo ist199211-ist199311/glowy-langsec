@@ -1,8 +1,10 @@
 use parser::ast::{CallNode, ExprNode, IfNode};
 
+use super::exprs::visit_expr;
 use crate::context::VisitFileContext;
 
 pub fn visit_if<'a>(context: &mut VisitFileContext<'a, '_>, node: &IfNode<'a>) {
+    let label = visit_expr(context, &node.cond);
     todo!()
 }
 
