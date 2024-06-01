@@ -1,5 +1,4 @@
 use errors::AnalysisError;
-use labels::{Label, LabelBacktrace};
 
 use crate::{context::AnalysisContext, taint::visit_source_file};
 

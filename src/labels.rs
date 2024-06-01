@@ -1,4 +1,4 @@
-use std::{backtrace, cmp::Ordering, collections::BTreeSet, fmt::Display, ops::BitOr};
+use std::{cmp::Ordering, collections::BTreeSet, fmt::Display};
 
 use parser::Span;
 

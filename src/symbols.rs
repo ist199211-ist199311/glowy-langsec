@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use parser::Span;
 
-use crate::labels::{Label, LabelBacktrace};
+use crate::labels::LabelBacktrace;
 
 pub type SymbolScope<'a> = HashMap<&'a str, Symbol<'a>>;
 
