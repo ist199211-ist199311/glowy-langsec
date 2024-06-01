@@ -1,4 +1,4 @@
-use crate::{Annotation, Span};
+use crate::{Annotation, Location, Span};
 
 #[derive(Debug, PartialEq)]
 pub struct SourceFileNode<'a> {
@@ -27,10 +27,12 @@ pub struct ImportSpecNode<'a> {
 pub enum DeclNode<'a> {
     Const {
         specs: Vec<BindingDeclSpecNode<'a>>,
+        location: Location,
         annotation: Option<Box<Annotation<'a>>>,
     },
     Var {
         specs: Vec<BindingDeclSpecNode<'a>>,
+        location: Location,
         annotation: Option<Box<Annotation<'a>>>,
     },
     Function(FunctionDeclNode<'a>),
@@ -130,11 +132,13 @@ pub enum ExprNode<'a> {
     UnaryOp {
         kind: UnaryOpKind,
         operand: Box<ExprNode<'a>>,
+        location: Location, // for better error messages
     },
     BinaryOp {
         kind: BinaryOpKind,
         left: Box<ExprNode<'a>>,
         right: Box<ExprNode<'a>>,
+        location: Location, // for better error messages
     },
 }
 
@@ -213,7 +217,8 @@ pub enum LiteralNode {
 pub struct CallNode<'a> {
     pub func: Box<ExprNode<'a>>,
     pub args: Vec<ExprNode<'a>>,
-    pub variadic: bool, // whether the last argument is "x..."
+    pub variadic: bool,     // whether the last argument is "x..."
+    pub location: Location, // for better error messages
     pub annotation: Option<Box<Annotation<'a>>>,
 }
 
@@ -221,6 +226,7 @@ pub struct CallNode<'a> {
 pub struct IndexingNode<'a> {
     pub expr: Box<ExprNode<'a>>,
     pub index: Box<ExprNode<'a>>,
+    pub location: Location, // for better error messages
 }
 
 pub type BlockNode<'a> = Vec<StatementNode<'a>>;
@@ -231,8 +237,14 @@ pub enum StatementNode<'a> {
     Empty,
     Expr(ExprNode<'a>),
     Send(SendNode<'a>),
-    Inc(ExprNode<'a>),
-    Dec(ExprNode<'a>),
+    Inc {
+        operand: ExprNode<'a>,
+        location: Location, // for better error messages
+    },
+    Dec {
+        operand: ExprNode<'a>,
+        location: Location, // for better error messages
+    },
     Assignment(AssignmentNode<'a>),
     ShortVarDecl(ShortVarDeclNode<'a>),
 
@@ -240,7 +252,10 @@ pub enum StatementNode<'a> {
     Decl(DeclNode<'a>),
     If(IfNode<'a>),
     Block(BlockNode<'a>),
-    Return(Vec<ExprNode<'a>>),
+    Return {
+        exprs: Vec<ExprNode<'a>>,
+        location: Location, // for better error messages
+    },
     Go(ExprNode<'a>),
 }
 
@@ -290,6 +305,7 @@ impl<'a> From<BlockNode<'a>> for StatementNode<'a> {
 pub struct SendNode<'a> {
     pub channel: ExprNode<'a>,
     pub expr: ExprNode<'a>,
+    pub location: Location, // for better error messages
 }
 
 #[derive(Debug, PartialEq)]
@@ -297,6 +313,7 @@ pub struct AssignmentNode<'a> {
     pub kind: AssignmentKind,
     pub lhs: Vec<ExprNode<'a>>,
     pub rhs: Vec<ExprNode<'a>>,
+    pub location: Location, // for better error messages
 }
 
 #[derive(Debug, PartialEq)]
@@ -319,6 +336,7 @@ pub enum AssignmentKind {
 pub struct ShortVarDeclNode<'a> {
     pub ids: Vec<Span<'a>>,
     pub exprs: Vec<ExprNode<'a>>,
+    pub location: Location, // for better error messages
 }
 
 #[derive(Debug, PartialEq)]

@@ -41,12 +41,15 @@ pub fn parse_if_statement<'a>(s: &mut TokenStream<'a>) -> PResult<'a, IfNode<'a>
 }
 
 pub fn parse_return_statement<'a>(s: &mut TokenStream<'a>) -> PResult<'a, StatementNode<'a>> {
-    expect(s, TokenKind::Return, Some("return statement"))?;
+    let token = expect(s, TokenKind::Return, Some("return statement"))?;
 
     let exprs = parse_expressions_list_while(s, |token| !terminal_token(&token.kind))?
         .unwrap_or_else(Vec::new); // a potentially better error will be thrown higher up the chain
 
-    Ok(StatementNode::Return(exprs))
+    Ok(StatementNode::Return {
+        exprs,
+        location: s.location_since(&token),
+    })
 }
 
 #[cfg(test)]
@@ -63,9 +66,9 @@ mod tests {
     };
 
     fn parse(input: &str) -> PResult<'_, BlockNode<'_>> {
-        let mut lexer = Lexer::new(input).peekable();
+        let mut stream = TokenStream::new(Lexer::new(input));
 
-        parse_block(&mut lexer)
+        parse_block(&mut stream)
     }
 
     #[test]
@@ -80,9 +83,11 @@ mod tests {
                             package: None,
                             id: Span::new("a", 50, 3)
                         })),
-                        right: Box::new(ExprNode::Literal(LiteralNode::Int(3)))
+                        right: Box::new(ExprNode::Literal(LiteralNode::Int(3))),
+                        location: 50..55,
                     }),
-                    right: Box::new(ExprNode::Literal(LiteralNode::Int(4)))
+                    right: Box::new(ExprNode::Literal(LiteralNode::Int(4))),
+                    location: 50..59,
                 },
                 then: vec![
                     StatementNode::Empty,
@@ -92,7 +97,8 @@ mod tests {
                             package: None,
                             id: Span::new("a", 120, 5)
                         })],
-                        rhs: vec![ExprNode::Literal(LiteralNode::Int(4))]
+                        rhs: vec![ExprNode::Literal(LiteralNode::Int(4))],
+                        location: 120..125,
                     })
                 ],
                 otherwise: Some(ElseNode::If(Box::new(IfNode {
@@ -100,19 +106,25 @@ mod tests {
                         kind: UnaryOpKind::Negation,
                         operand: Box::new(ExprNode::UnaryOp {
                             kind: UnaryOpKind::Negation,
-                            operand: Box::new(ExprNode::Literal(LiteralNode::Int(9)))
-                        })
+                            operand: Box::new(ExprNode::Literal(LiteralNode::Int(9))),
+                            location: 163..165,
+                        }),
+                        location: 161..166,
                     },
                     then: vec![StatementNode::ShortVarDecl(ShortVarDeclNode {
                         ids: vec![Span::new("k", 197, 7)],
-                        exprs: vec![ExprNode::Literal(LiteralNode::Int(3))]
+                        exprs: vec![ExprNode::Literal(LiteralNode::Int(3))],
+                        location: 197..203,
                     })],
                     otherwise: Some(ElseNode::Block(vec![
                         StatementNode::Block(vec![]),
-                        StatementNode::Dec(ExprNode::Name(OperandNameNode {
-                            package: None,
-                            id: Span::new("m", 298, 10)
-                        })),
+                        StatementNode::Dec {
+                            operand: ExprNode::Name(OperandNameNode {
+                                package: None,
+                                id: Span::new("m", 298, 10),
+                            }),
+                            location: 298..301,
+                        },
                         StatementNode::Assignment(AssignmentNode {
                             kind: AssignmentKind::BitClear,
                             lhs: vec![
@@ -128,7 +140,8 @@ mod tests {
                             rhs: vec![
                                 ExprNode::Literal(LiteralNode::Int(3)),
                                 ExprNode::Literal(LiteralNode::Int(2)),
-                            ]
+                            ],
+                            location: 331..346,
                         })
                     ]))
                 })))

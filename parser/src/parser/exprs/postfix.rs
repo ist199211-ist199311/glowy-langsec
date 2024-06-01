@@ -7,7 +7,7 @@ use crate::{
 };
 
 pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a, CallNode<'a>> {
-    let annotation = expect(s, TokenKind::ParenL, Some("function call"))?.annotation;
+    let paren = expect(s, TokenKind::ParenL, Some("function call"))?;
 
     // TODO: support trailing comma
 
@@ -33,7 +33,8 @@ pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a
         func: Box::new(func),
         args,
         variadic,
-        annotation,
+        location: s.location_since(&paren),
+        annotation: paren.annotation,
     })
 }
 
@@ -41,7 +42,7 @@ pub fn parse_indexing<'a>(
     s: &mut TokenStream<'a>,
     expr: ExprNode<'a>,
 ) -> PResult<'a, IndexingNode<'a>> {
-    expect(s, TokenKind::SquareL, Some("indexing expression"))?;
+    let open = expect(s, TokenKind::SquareL, Some("indexing expression"))?;
 
     let index = parse_expression(s)?;
 
@@ -55,6 +56,7 @@ pub fn parse_indexing<'a>(
     Ok(IndexingNode {
         expr: Box::new(expr),
         index: Box::new(index),
+        location: s.location_since(&open),
     })
 }
 
@@ -82,9 +84,9 @@ mod tests {
     };
 
     fn parse(input: &str) -> PResult<'_, ExprNode<'_>> {
-        let mut lexer = Lexer::new(input).peekable();
+        let mut stream = TokenStream::new(Lexer::new(input));
 
-        parse_expression(&mut lexer)
+        parse_expression(&mut stream)
     }
 
     #[test]
@@ -98,7 +100,8 @@ mod tests {
                             package: Some(Span::new("abc", 1, 1)),
                             id: Span::new("def", 5, 1)
                         })),
-                        right: Box::new(ExprNode::Literal(LiteralNode::Int(14)))
+                        right: Box::new(ExprNode::Literal(LiteralNode::Int(14))),
+                        location: 1..13,
                     }),
                     args: vec![
                         ExprNode::BinaryOp {
@@ -109,17 +112,22 @@ mod tests {
                                 left: Box::new(ExprNode::Literal(LiteralNode::Int(7))),
                                 right: Box::new(ExprNode::UnaryOp {
                                     kind: UnaryOpKind::Negation,
-                                    operand: Box::new(ExprNode::Literal(LiteralNode::Int(9)))
-                                })
+                                    operand: Box::new(ExprNode::Literal(LiteralNode::Int(9))),
+                                    location: 24..26,
+                                }),
+                                location: 20..26,
                             }),
+                            location: 15..26,
                         },
                         ExprNode::Literal(LiteralNode::Int(0))
                     ],
                     variadic: true,
+                    location: 14..33,
                     annotation: None,
                 })),
                 args: vec![],
                 variadic: false,
+                location: 33..35,
                 annotation: None
             }),
             parse("(abc.def + 14)(21 + 7 * -9, 0...)()").unwrap()
@@ -137,7 +145,8 @@ mod tests {
                             package: Some(Span::new("abc", 1, 1)),
                             id: Span::new("def", 5, 1)
                         })),
-                        right: Box::new(ExprNode::Literal(LiteralNode::Int(14)))
+                        right: Box::new(ExprNode::Literal(LiteralNode::Int(14))),
+                        location: 1..13,
                     }),
                     index: Box::new(ExprNode::BinaryOp {
                         kind: BinaryOpKind::Sum,
@@ -146,10 +155,13 @@ mod tests {
                             id: Span::new("k", 15, 1)
                         })),
                         right: Box::new(ExprNode::Literal(LiteralNode::Int(2))),
+                        location: 15..20,
                     }),
+                    location: 14..22,
                 })),
                 args: vec![],
                 variadic: false,
+                location: 22..24,
                 annotation: None
             }),
             parse("(abc.def + 14)[k + 2,]()").unwrap()

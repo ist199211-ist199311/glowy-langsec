@@ -34,12 +34,13 @@ fn infix_binding_power(op: &BinaryOpKind) -> (u8, u8) {
 
 fn parse_unary<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
     if let Some(token) = s.peek().cloned().transpose()? {
-        if let Ok(op) = token.kind.try_into() {
+        if let Ok(op) = token.kind.clone().try_into() {
             s.next(); // advance
 
             return Ok(ExprNode::UnaryOp {
                 kind: op,
                 operand: Box::new(parse_unary(s)?),
+                location: s.location_since(&token),
             });
         }
     }
@@ -48,6 +49,7 @@ fn parse_unary<'a>(s: &mut TokenStream<'a>) -> PResult<'a, ExprNode<'a>> {
 }
 
 pub fn parse_expression_bp<'a>(s: &mut TokenStream<'a>, min_bp: u8) -> PResult<'a, ExprNode<'a>> {
+    let peeked = s.peek().cloned(); // need to remember location
     let mut lhs = parse_unary(s)?;
 
     while let Some(token) = s.peek().cloned().transpose()? {
@@ -70,6 +72,7 @@ pub fn parse_expression_bp<'a>(s: &mut TokenStream<'a>, min_bp: u8) -> PResult<'
             kind: op,
             left: Box::new(lhs),
             right: Box::new(rhs),
+            location: s.location_since(&peeked.clone().unwrap().unwrap()),
         }
     }
 
@@ -138,9 +141,9 @@ mod tests {
     };
 
     fn parse(input: &str) -> PResult<'_, ExprNode<'_>> {
-        let mut lexer = Lexer::new(input).peekable();
+        let mut stream = TokenStream::new(Lexer::new(input));
 
-        parse_expression_bp(&mut lexer, 0)
+        parse_expression_bp(&mut stream, 0)
     }
 
     #[test]
@@ -158,10 +161,13 @@ mod tests {
                             operand: Box::new(ExprNode::Name(OperandNameNode {
                                 package: None,
                                 id: Span::new("a", 6, 1)
-                            }))
+                            })),
+                            location: 5..7
                         }),
-                        right: Box::new(ExprNode::Literal(LiteralNode::Int(3)))
-                    })
+                        right: Box::new(ExprNode::Literal(LiteralNode::Int(3))),
+                        location: 5..11
+                    }),
+                    location: 0..11
                 }),
                 right: Box::new(ExprNode::BinaryOp {
                     kind: BinaryOpKind::LogicalAnd,
@@ -175,15 +181,18 @@ mod tests {
                             kind: BinaryOpKind::Eq,
                             left: Box::new(ExprNode::UnaryOp {
                                 kind: UnaryOpKind::Identity,
-                                operand: Box::new(ExprNode::Literal(LiteralNode::Int(2)))
+                                operand: Box::new(ExprNode::Literal(LiteralNode::Int(2))),
+                                location: 20..22
                             }),
-                            right: Box::new(ExprNode::Literal(LiteralNode::Int(4)))
+                            right: Box::new(ExprNode::Literal(LiteralNode::Int(4))),
+                            location: 20..27
                         }),
                         right: Box::new(ExprNode::BinaryOp {
                             kind: BinaryOpKind::BitwiseXor,
                             left: Box::new(ExprNode::UnaryOp {
                                 kind: UnaryOpKind::Receive,
-                                operand: Box::new(ExprNode::Literal(LiteralNode::Int(9)))
+                                operand: Box::new(ExprNode::Literal(LiteralNode::Int(9))),
+                                location: 31..34
                             }),
                             right: Box::new(ExprNode::BinaryOp {
                                 kind: BinaryOpKind::ShiftLeft,
@@ -191,11 +200,16 @@ mod tests {
                                 right: Box::new(ExprNode::Name(OperandNameNode {
                                     package: None,
                                     id: Span::new("abc", 42, 1)
-                                }))
-                            })
-                        })
-                    })
-                })
+                                })),
+                                location: 37..45
+                            }),
+                            location: 31..45
+                        }),
+                        location: 20..45
+                    }),
+                    location: 15..45
+                }),
+                location: 0..45
             },
             parse("42 + -a * 3 || b && +2 == 4 == <-9 ^ 2 << abc").unwrap()
         );
@@ -215,9 +229,12 @@ mod tests {
                         operand: Box::new(ExprNode::Name(OperandNameNode {
                             package: Some(Span::new("ab", 13, 2)),
                             id: Span::new("cd", 16, 2)
-                        }))
+                        })),
+                        location: 11..18
                     }),
-                })
+                    location: 7..18
+                }),
+                location: 0..19
             },
             parse("2 * \n (3 - &\tab.cd)").unwrap()
         );

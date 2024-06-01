@@ -2,7 +2,7 @@ use crate::{
     ast::{BindingDeclSpecNode, DeclNode},
     parser::{expect, exprs::parse_expression, of_kind, types::parse_type, PResult},
     token::{Annotation, Token, TokenKind},
-    ParsingError, TokenStream,
+    Location, ParsingError, TokenStream,
 };
 
 // bindings is our term for constants and variables,
@@ -45,11 +45,20 @@ impl BindingKind {
     fn build_node<'a>(
         &self,
         specs: Vec<BindingDeclSpecNode<'a>>,
+        location: Location,
         annotation: Option<Box<Annotation<'a>>>,
     ) -> DeclNode<'a> {
         match self {
-            Self::Const => DeclNode::Const { specs, annotation },
-            Self::Var => DeclNode::Var { specs, annotation },
+            Self::Const => DeclNode::Const {
+                specs,
+                location,
+                annotation,
+            },
+            Self::Var => DeclNode::Var {
+                specs,
+                location,
+                annotation,
+            },
         }
     }
 }
@@ -151,7 +160,7 @@ fn parse_binding_decl<'a>(s: &mut TokenStream<'a>, kind: BindingKind) -> PResult
         }
     };
 
-    Ok(kind.build_node(specs, token.annotation))
+    Ok(kind.build_node(specs, s.location_since(&token), token.annotation))
 }
 
 pub fn parse_const_decl<'a>(s: &mut TokenStream<'a>) -> PResult<'a, DeclNode<'a>> {

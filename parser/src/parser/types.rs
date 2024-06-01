@@ -107,9 +107,9 @@ mod tests {
     use crate::{lexer::Lexer, Span};
 
     fn parse(input: &str) -> PResult<'_, TypeNode<'_>> {
-        let mut lexer = Lexer::new(input).peekable();
+        let mut stream = TokenStream::new(Lexer::new(input));
 
-        parse_type(&mut lexer)
+        parse_type(&mut stream)
     }
 
     #[test]

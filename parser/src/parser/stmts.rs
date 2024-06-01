@@ -24,11 +24,17 @@ mod flow;
 // continue from the right-hand side
 fn resume_parsing_assignment_rhs<'a>(
     s: &mut TokenStream<'a>,
+    starting_at: &Token<'a>,
     lhs: Vec<ExprNode<'a>>,
     kind: AssignmentKind,
 ) -> PResult<'a, StatementNode<'a>> {
     if let Some(rhs) = parse_expressions_list_while(s, |t| !terminal_token(&t.kind))? {
-        Ok(StatementNode::Assignment(AssignmentNode { kind, lhs, rhs }))
+        Ok(StatementNode::Assignment(AssignmentNode {
+            kind,
+            lhs,
+            rhs,
+            location: s.location_since(starting_at),
+        }))
     } else {
         // reached end-of-file...
         expect(s, TokenKind::SemiColon, Some("assignment"))?;
@@ -40,6 +46,7 @@ fn resume_parsing_assignment_rhs<'a>(
 // continue from the left-hand side
 fn resume_parsing_assignment_lhs<'a>(
     s: &mut TokenStream<'a>,
+    starting_at: &Token<'a>,
     mut lhs: Vec<ExprNode<'a>>,
 ) -> PResult<'a, StatementNode<'a>> {
     // collect the rest of the expressions, if any
@@ -47,7 +54,7 @@ fn resume_parsing_assignment_lhs<'a>(
         s.next(); // step over operator
 
         lhs.extend(rest);
-        resume_parsing_assignment_rhs(s, lhs, kind)
+        resume_parsing_assignment_rhs(s, starting_at, lhs, kind)
     } else {
         // reached end-of-file and found no assignment operator...
         Err(ParsingError::UnexpectedConstruct {
@@ -59,6 +66,8 @@ fn resume_parsing_assignment_lhs<'a>(
 
 // statements that start with an expression and then diverge wrt operator
 fn parse_expression_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, StatementNode<'a>> {
+    let peeked = s.peek().cloned(); // need to remember location
+
     let lhs = parse_expression(s)?;
 
     // this needs to be separate so we don't consume the semicolon,
@@ -73,14 +82,28 @@ fn parse_expression_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
         Some(of_kind!(TokenKind::LtMinus)) => StatementNode::Send(SendNode {
             channel: lhs,
             expr: parse_expression(s)?,
+            location: s.location_since(&peeked.unwrap().unwrap()),
         }),
-        Some(of_kind!(TokenKind::PlusPlus)) => StatementNode::Inc(lhs),
-        Some(of_kind!(TokenKind::MinusMinus)) => StatementNode::Dec(lhs),
-        Some(of_kind!(TokenKind::Comma)) => resume_parsing_assignment_lhs(s, vec![lhs])?,
+        Some(of_kind!(TokenKind::PlusPlus)) => StatementNode::Inc {
+            operand: lhs,
+            location: s.location_since(&peeked.unwrap().unwrap()),
+        },
+        Some(of_kind!(TokenKind::MinusMinus)) => StatementNode::Dec {
+            operand: lhs,
+            location: s.location_since(&peeked.unwrap().unwrap()),
+        },
+        Some(of_kind!(TokenKind::Comma)) => {
+            resume_parsing_assignment_lhs(s, &peeked.unwrap().unwrap(), vec![lhs])?
+        }
         found => {
             if let Some(token) = found.clone() {
                 if let Ok(kind) = AssignmentKind::try_from(token.kind) {
-                    return resume_parsing_assignment_rhs(s, vec![lhs], kind);
+                    return resume_parsing_assignment_rhs(
+                        s,
+                        &peeked.unwrap().unwrap(),
+                        vec![lhs],
+                        kind,
+                    );
                 }
             }
 
@@ -102,7 +125,7 @@ fn parse_identifier_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
     let first = expect(b, TokenKind::Ident, Some("statement"))?;
 
     // assume it's a short var decl and that we're collecting ids (vs expressions)
-    let mut ids = vec![first.span];
+    let mut ids = vec![first.span.clone()];
 
     let mut was_comma = false; // whether the last token was a comma
 
@@ -141,7 +164,11 @@ fn parse_identifier_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
     context.commit()?; // we're sure it's a short var decl so we can go back to the main stream now
 
     if let Some(exprs) = parse_expressions_list_while(s, |t| !terminal_token(&t.kind))? {
-        Ok(StatementNode::ShortVarDecl(ShortVarDeclNode { ids, exprs }))
+        Ok(StatementNode::ShortVarDecl(ShortVarDeclNode {
+            ids,
+            exprs,
+            location: s.location_since(&first),
+        }))
     } else {
         // reached end-of-file...
         expect(s, TokenKind::SemiColon, Some("short variable declaration"))?;
@@ -236,9 +263,9 @@ mod tests {
     };
 
     fn parse(input: &str) -> PResult<'_, BlockNode<'_>> {
-        let mut lexer = Lexer::new(input).peekable();
+        let mut stream = TokenStream::new(Lexer::new(input));
 
-        parse_block(&mut lexer)
+        parse_block(&mut stream)
     }
 
     #[test]
@@ -248,7 +275,8 @@ mod tests {
                 StatementNode::Expr(ExprNode::BinaryOp {
                     kind: BinaryOpKind::Sum,
                     left: Box::new(ExprNode::Literal(LiteralNode::Int(2))),
-                    right: Box::new(ExprNode::Literal(LiteralNode::Int(7)))
+                    right: Box::new(ExprNode::Literal(LiteralNode::Int(7))),
+                    location: 39..44,
                 }),
                 StatementNode::Empty,
                 StatementNode::Assignment(AssignmentNode {
@@ -272,14 +300,16 @@ mod tests {
                             package: None,
                             id: Span::new("d", 98, 5)
                         })
-                    ]
+                    ],
+                    location: 88..99,
                 }),
                 StatementNode::Assignment(AssignmentNode {
                     kind: AssignmentKind::Simple,
                     lhs: vec![
                         ExprNode::UnaryOp {
                             kind: UnaryOpKind::Negation,
-                            operand: Box::new(ExprNode::Literal(LiteralNode::Int(4)))
+                            operand: Box::new(ExprNode::Literal(LiteralNode::Int(4))),
+                            location: 121..123,
                         },
                         ExprNode::Name(OperandNameNode {
                             package: None,
@@ -294,18 +324,21 @@ mod tests {
                         ExprNode::BinaryOp {
                             kind: BinaryOpKind::Product,
                             left: Box::new(ExprNode::Literal(LiteralNode::Int(4))),
-                            right: Box::new(ExprNode::Literal(LiteralNode::Int(2)))
+                            right: Box::new(ExprNode::Literal(LiteralNode::Int(2))),
+                            location: 134..139,
                         },
                         ExprNode::BinaryOp {
                             kind: BinaryOpKind::Sum,
                             left: Box::new(ExprNode::Literal(LiteralNode::Int(5))),
-                            right: Box::new(ExprNode::Literal(LiteralNode::Int(2)))
+                            right: Box::new(ExprNode::Literal(LiteralNode::Int(2))),
+                            location: 141..146,
                         },
                         ExprNode::Name(OperandNameNode {
                             package: None,
                             id: Span::new("x", 148, 6)
                         })
-                    ]
+                    ],
+                    location: 121..149,
                 }),
                 StatementNode::ShortVarDecl(ShortVarDeclNode {
                     ids: vec![
@@ -326,7 +359,8 @@ mod tests {
                             package: None,
                             id: Span::new("o", 188, 7)
                         })
-                    ]
+                    ],
+                    location: 171..189,
                 }),
                 StatementNode::Assignment(AssignmentNode {
                     kind: AssignmentKind::Simple,
@@ -337,14 +371,16 @@ mod tests {
                     rhs: vec![ExprNode::Name(OperandNameNode {
                         package: None,
                         id: Span::new("b", 215, 8)
-                    })]
+                    })],
+                    location: 211..216,
                 }),
                 StatementNode::ShortVarDecl(ShortVarDeclNode {
                     ids: vec![Span::new("c", 238, 9)],
                     exprs: vec![ExprNode::Name(OperandNameNode {
                         package: None,
                         id: Span::new("d", 243, 9)
-                    })]
+                    })],
+                    location: 238..244,
                 })
             ],
             parse(

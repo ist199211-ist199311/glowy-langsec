@@ -39,7 +39,16 @@ pub fn visit_source_file<'a>(
 
 fn visit_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &DeclNode<'a>) {
     match node {
-        DeclNode::Const { specs, annotation } | DeclNode::Var { specs, annotation } => {
+        DeclNode::Const {
+            specs,
+            location,
+            annotation,
+        }
+        | DeclNode::Var {
+            specs,
+            location,
+            annotation,
+        } => {
             for spec in specs {
                 visit_binding_decl_spec(context, spec, annotation);
             }
@@ -57,7 +66,9 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
             visit_expr(context, expr);
         }
         StatementNode::Send(_) => todo!(),
-        StatementNode::Inc(expr) | StatementNode::Dec(expr) => visit_incdec(context, expr),
+        StatementNode::Inc { operand, location } | StatementNode::Dec { operand, location } => {
+            visit_incdec(context, operand)
+        }
         StatementNode::Assignment(assignment) => visit_assignment(context, assignment),
         StatementNode::ShortVarDecl(decl) => visit_short_var_decl(context, decl),
         StatementNode::Decl(decl) => visit_decl(context, decl),
@@ -67,7 +78,7 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
                 visit_statement(context, statement);
             }
         }
-        StatementNode::Return(exprs) => visit_return(context, exprs),
+        StatementNode::Return { exprs, location } => visit_return(context, exprs),
         StatementNode::Go(expr) => match expr {
             ExprNode::Call(call) => visit_go(context, call),
             _ => panic!("invalid go statement; expected function call"), // TODO: don't panic

@@ -4,8 +4,8 @@ use imports::try_parse_import;
 use crate::{
     ast::{PackageClauseNode, SourceFileNode},
     errors::ParsingError,
+    stream::TokenStream,
     token::{Token, TokenKind},
-    TokenStream,
 };
 
 mod decls;
