@@ -8,7 +8,7 @@ use parser::{
 use super::visit_expr;
 use crate::{
     context::VisitFileContext,
-    errors::AnalysisError,
+    errors::{AnalysisError, InsecureFlowKind},
     labels::{Label, LabelBacktrace, LabelBacktraceType},
     symbols::Symbol,
 };
@@ -19,18 +19,18 @@ pub fn visit_binding_decl_spec<'a>(
     annotation: &Option<Box<Annotation<'a>>>,
 ) {
     for (name, expr) in &node.mapping {
-        let assignment_label_backtrace = visit_expr(context, expr);
-        let mut label = assignment_label_backtrace
+        let expr_backtrace = visit_expr(context, expr);
+        let mut label = expr_backtrace
             .iter()
             .fold(Label::Bottom, |acc, backtrace| acc.union(backtrace.label()));
-        let mut label_backtraces = vec![];
+        let mut backtraces = vec![];
 
         if let Some(annotation) = annotation {
             match annotation.scope {
                 "label" => {
                     let annotation_label = Label::from_parts(&annotation.labels);
                     label = label.union(&annotation_label);
-                    label_backtraces.push(LabelBacktrace::new_explicit_annotation(
+                    backtraces.push(LabelBacktrace::new_explicit_annotation(
                         context.file(),
                         name.clone(),
                         annotation_label,
@@ -38,45 +38,41 @@ pub fn visit_binding_decl_spec<'a>(
                 }
                 "sink" => {
                     let sink_label = Label::from_parts(&annotation.labels);
-                    match label.partial_cmp(&sink_label) {
-                        None | Some(Ordering::Greater) => {
-                            let label_backtrace = LabelBacktrace::new(
-                                LabelBacktraceType::Assignment,
-                                context.file(),
-                                name.clone(),
-                                label.clone(),
-                                label_backtraces
-                                    .iter()
-                                    .chain(assignment_label_backtrace.iter()),
-                            );
-                            context.report_error(
-                                name.location(),
-                                AnalysisError::DataFlowAssignment {
-                                    sink_label,
-                                    label_backtrace: label_backtrace
-                                        .expect("label of assignment to not be bottom"),
-                                },
-                            )
-                        }
-                        _ => {}
+
+                    if let None | Some(Ordering::Greater) = label.partial_cmp(&sink_label) {
+                        let backtrace = LabelBacktrace::new(
+                            LabelBacktraceType::Assignment,
+                            context.file(),
+                            name.clone(),
+                            label.clone(),
+                            backtraces.iter().chain(expr_backtrace.iter()),
+                        )
+                        .expect("assignment label should not be bottom");
+
+                        context.report_error(
+                            name.location(),
+                            AnalysisError::InsecureFlow {
+                                kind: InsecureFlowKind::Assignment,
+                                sink_label,
+                                backtrace,
+                            },
+                        );
                     }
                 }
                 _ => {}
             }
         }
 
-        let label_backtrace = LabelBacktrace::new(
+        let backtrace = LabelBacktrace::new(
             LabelBacktraceType::Assignment,
             context.file(),
             name.clone(),
             label,
-            label_backtraces
-                .iter()
-                .chain(assignment_label_backtrace.iter()),
+            backtraces.iter().chain(expr_backtrace.iter()),
         );
 
         let new_symbol =
-            Symbol::new_with_package(context.current_package(), name.clone(), label_backtrace);
+            Symbol::new_with_package(context.current_package(), name.clone(), backtrace);
         if let Some(prev_symbol) = context.symbol_table.create_symbol(new_symbol) {
             context.report_error(
                 name.location(),

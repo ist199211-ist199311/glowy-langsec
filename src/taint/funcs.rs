@@ -5,7 +5,7 @@ use parser::ast::{CallNode, ExprNode, FunctionDeclNode};
 use super::{exprs::find_first_ident, visit_expr, visit_statement};
 use crate::{
     context::VisitFileContext,
-    errors::AnalysisError,
+    errors::{AnalysisError, InsecureFlowKind},
     labels::{Label, LabelBacktrace, LabelBacktraceType},
     symbols::Symbol,
 };
@@ -47,7 +47,7 @@ pub fn visit_call<'a>(
     node: &CallNode<'a>,
 ) -> Vec<LabelBacktrace<'a>> {
     let mut label = Label::Bottom;
-    let label_backtraces: Vec<_> = node
+    let args_backtraces: Vec<_> = node
         .args
         .iter()
         .flat_map(|arg| visit_expr(context, arg))
@@ -56,37 +56,37 @@ pub fn visit_call<'a>(
 
     // TODO handle this properly by providing a span for expressions in the parser
     let symbol = find_first_ident(&node.func)
-        .expect("glowy currently only supports calling functions by their identifiers");
-    let label_backtrace = LabelBacktrace::new(
+        .expect("Glowy currently only supports calling functions by their identifiers");
+    let backtrace = LabelBacktrace::new(
         LabelBacktraceType::FunctionCall,
         context.file(),
         symbol.clone(),
         label.clone(),
-        &label_backtraces,
+        &args_backtraces,
     );
 
     if let Some(annotation) = &node.annotation {
-        match annotation.scope {
-            "sink" => {
-                let sink_label = Label::from_parts(&annotation.labels);
-                match label.partial_cmp(&sink_label) {
-                    None | Some(Ordering::Greater) => context.report_error(
-                        symbol.location(),
-                        AnalysisError::DataFlowFuncCall {
-                            sink_label,
-                            label_backtrace: label_backtrace
-                                .clone()
-                                .expect("label of function call to not be bottom"),
-                        },
-                    ),
-                    _ => {}
-                }
+        if annotation.scope == "sink" {
+            let sink_label = Label::from_parts(&annotation.labels);
+
+            if let None | Some(Ordering::Greater) = label.partial_cmp(&sink_label) {
+                context.report_error(
+                    symbol.location(),
+                    AnalysisError::InsecureFlow {
+                        kind: InsecureFlowKind::Call,
+                        sink_label,
+                        backtrace: backtrace
+                            .clone()
+                            .expect("call label should not to be bottom"),
+                    },
+                );
             }
-            _ => {}
+        } else {
+            // TODO: error message
         }
     }
 
-    label_backtrace.into_iter().collect()
+    backtrace.into_iter().collect()
 }
 
 pub fn visit_return<'a>(context: &mut VisitFileContext<'a, '_>, exprs: &[ExprNode<'a>]) {

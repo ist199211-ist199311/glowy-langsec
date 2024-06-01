@@ -181,9 +181,11 @@ impl<'a> LabelBacktrace<'a> {
         backtrace: &LabelBacktrace<'a>,
     ) -> Option<LabelBacktrace<'a>> {
         let new_label = label.intersect(backtrace.label());
-        match new_label {
-            Label::Bottom => None,
-            new_label => Some(Self {
+
+        if new_label == Label::Bottom {
+            None
+        } else {
+            Some(Self {
                 r#type: backtrace.r#type,
                 file_id: backtrace.file_id,
                 symbol: backtrace.symbol.clone(),
@@ -193,7 +195,7 @@ impl<'a> LabelBacktrace<'a> {
                     .iter()
                     .filter_map(|child| Self::restrict_to_label(label, child))
                     .collect(),
-            }),
+            })
         }
     }
 

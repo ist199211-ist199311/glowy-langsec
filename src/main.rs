@@ -84,53 +84,27 @@ fn get_diagnostic_for_error<'a>(
                 )
                 .to_owned()])
         }
-        AnalysisError::DataFlowAssignment {
+        AnalysisError::InsecureFlow {
+            kind,
             sink_label,
-            label_backtrace,
-        } => {
-            dbg!(&label_backtrace);
-            Diagnostic::error()
-                .with_code("E001")
-                .with_message(s!("insecure data flow to sink during assigment"))
-                .with_labels(
-                    std::iter::once(
-                        Label::primary(label_backtrace.file(), label_backtrace.symbol().location())
-                            .with_message(format!(
-                                "sink `{}` has label {}, but the expression being assigned to it \
-                                 has label {}",
-                                label_backtrace.symbol().content(),
-                                sink_label,
-                                label_backtrace.label(),
-                            )),
-                    )
-                    .chain(
-                        label_backtrace
-                            .children()
-                            .iter()
-                            .flat_map(flatten_label_backtrace),
-                    )
-                    .collect(),
-                )
-        }
-        AnalysisError::DataFlowFuncCall {
-            sink_label,
-            label_backtrace,
+            backtrace,
         } => Diagnostic::error()
-            .with_code("E002")
-            .with_message(s!("insecure data flow to sink during function call"))
+            .with_code(format!("F{:0>3}", kind.code()))
+            .with_message(format!("insecure data flow to sink in {}", kind.context()))
             .with_labels(
                 std::iter::once(
-                    Label::primary(label_backtrace.file(), label_backtrace.symbol().location())
-                        .with_message(format!(
-                            "sink `{}` has label {}, but the arguments in the function call have \
-                             label {}",
-                            label_backtrace.symbol().content(),
+                    Label::primary(backtrace.file(), backtrace.symbol().location()).with_message(
+                        format!(
+                            "sink `{}` has label {}, but {} has label {}",
+                            backtrace.symbol().content(),
                             sink_label,
-                            label_backtrace.label(),
-                        )),
+                            kind.operand(),
+                            backtrace.label(),
+                        ),
+                    ),
                 )
                 .chain(
-                    label_backtrace
+                    backtrace
                         .children()
                         .iter()
                         .flat_map(flatten_label_backtrace),

@@ -18,18 +18,10 @@ impl ErrorLocation {
 
 #[derive(Debug)]
 pub enum AnalysisError<'a> {
-    // TODO
+    // Go errors
     Parsing {
         file: usize,
         error: ParsingError<'a>,
-    },
-    DataFlowAssignment {
-        sink_label: Label<'a>,
-        label_backtrace: LabelBacktrace<'a>,
-    },
-    DataFlowFuncCall {
-        sink_label: Label<'a>,
-        label_backtrace: LabelBacktrace<'a>,
     },
     UnknownSymbol {
         file: usize,
@@ -40,4 +32,40 @@ pub enum AnalysisError<'a> {
         prev_symbol: Span<'a>,
         new_symbol: Span<'a>,
     },
+
+    // IFC errors
+    InsecureFlow {
+        kind: InsecureFlowKind,
+        sink_label: Label<'a>,
+        backtrace: LabelBacktrace<'a>,
+    },
+}
+
+#[derive(Debug)]
+pub enum InsecureFlowKind {
+    Assignment,
+    Call,
+}
+
+impl InsecureFlowKind {
+    pub fn code(&self) -> u8 {
+        match self {
+            Self::Assignment => 1,
+            Self::Call => 2,
+        }
+    }
+
+    pub fn context(&self) -> &'static str {
+        match self {
+            Self::Assignment => "assignment",
+            Self::Call => "function call",
+        }
+    }
+
+    pub fn operand(&self) -> &'static str {
+        match self {
+            Self::Assignment => "the expression being assigned",
+            Self::Call => "an argument being passed",
+        }
+    }
 }
