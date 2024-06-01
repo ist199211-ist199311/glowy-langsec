@@ -147,8 +147,8 @@ fn visit_function_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &Functi
         }
     }
 
-    for statements in &node.body {
-        visit_statement(context, statements);
+    for statement in &node.body {
+        visit_statement(context, statement);
     }
 
     context.symbol_table.pop();
@@ -168,7 +168,11 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
             visit_decl(context, decl_node);
         }
         StatementNode::If(_) => todo!(),
-        StatementNode::Block(_) => todo!(),
+        StatementNode::Block(stmts) => {
+            for statement in stmts {
+                visit_statement(context, statement);
+            }
+        }
         StatementNode::Return(_) => todo!(),
         StatementNode::Go(_) => todo!(),
     }
