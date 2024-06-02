@@ -3,7 +3,11 @@ use parser::{
     Location,
 };
 
-use super::{explicit::visit_assignment, exprs::visit_expr, visit_statement};
+use super::{
+    explicit::visit_assignment,
+    exprs::{find_expr_location, visit_expr},
+    visit_statement,
+};
 use crate::{
     context::VisitFileContext,
     labels::{LabelBacktrace, LabelBacktraceKind},
@@ -15,7 +19,7 @@ pub fn visit_if<'a>(context: &mut VisitFileContext<'a, '_>, node: &IfNode<'a>) {
             LabelBacktrace::new(
                 LabelBacktraceKind::Branch,
                 backtrace.file(),
-                backtrace.location().clone(),
+                find_expr_location(&node.cond).unwrap_or_else(|| backtrace.location().clone()),
                 None,
                 backtrace.label().clone(),
                 &[backtrace],
