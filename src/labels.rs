@@ -48,7 +48,12 @@ impl<'a> Label<'a> {
             (Self::Top, _) => Self::Top,
             (Self::Parts(_), Self::Bottom) => self.clone(),
             (Self::Parts(lparts), Self::Parts(rparts)) => {
-                Self::Parts(lparts.difference(rparts).cloned().collect())
+                let new_parts: BTreeSet<_> = lparts.difference(rparts).cloned().collect();
+                if new_parts.is_empty() {
+                    Self::Bottom
+                } else {
+                    Self::Parts(new_parts)
+                }
             }
             (Self::Bottom, _) => Self::Bottom,
         }
@@ -376,6 +381,12 @@ mod tests {
             Label::from_parts(&["lbl1", "lbl3"]),
             Label::Bottom,
             Label::from_parts(&["lbl1", "lbl3"]),
+            Label::Bottom
+        );
+        difference!(
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::from_parts(&["lbl1", "lbl3"]),
+            Label::Bottom,
             Label::Bottom
         );
 
