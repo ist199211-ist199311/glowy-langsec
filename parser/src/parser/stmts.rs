@@ -131,7 +131,7 @@ fn parse_identifier_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
 
     loop {
         match b.peek().cloned().transpose()? {
-            Some(of_kind!(TokenKind::Ident)) if was_comma => {
+            Some(of_kind!(TokenKind::Ident)) => {
                 if was_comma {
                     ids.push(b.next().unwrap()?.span);
                     was_comma = false;
@@ -160,7 +160,7 @@ fn parse_identifier_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
         }
     }
 
-    b.next(); // step over operator that caused break
+    let token = b.next().unwrap()?; // step over operator that caused break
     context.commit()?; // we're sure it's a short var decl so we can go back to the main stream now
 
     if let Some(exprs) = parse_expressions_list_while(s, |t| !terminal_token(&t.kind))? {
@@ -168,6 +168,7 @@ fn parse_identifier_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
             ids,
             exprs,
             location: s.location_since(&first),
+            annotation: token.annotation,
         }))
     } else {
         // reached end-of-file...
@@ -361,6 +362,7 @@ mod tests {
                         })
                     ],
                     location: 171..189,
+                    annotation: None,
                 }),
                 StatementNode::Assignment(AssignmentNode {
                     kind: AssignmentKind::Simple,
@@ -381,6 +383,7 @@ mod tests {
                         id: Span::new("d", 243, 9)
                     })],
                     location: 238..244,
+                    annotation: None
                 })
             ],
             parse(

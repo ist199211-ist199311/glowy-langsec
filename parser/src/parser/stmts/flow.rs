@@ -115,6 +115,7 @@ mod tests {
                         ids: vec![Span::new("k", 197, 7)],
                         exprs: vec![ExprNode::Literal(LiteralNode::Int(3))],
                         location: 197..203,
+                        annotation: None
                     })],
                     otherwise: Some(ElseNode::Block(vec![
                         StatementNode::Block(vec![]),

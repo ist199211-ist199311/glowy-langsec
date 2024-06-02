@@ -337,6 +337,7 @@ pub struct ShortVarDeclNode<'a> {
     pub ids: Vec<Span<'a>>,
     pub exprs: Vec<ExprNode<'a>>,
     pub location: Location, // for better error messages
+    pub annotation: Option<Box<Annotation<'a>>>,
 }
 
 #[derive(Debug, PartialEq)]

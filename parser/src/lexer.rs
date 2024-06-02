@@ -637,8 +637,10 @@ impl<'a> Iterator for Lexer<'a> {
 
         self.skip_comments();
 
-        let token = match self.peek_char() {
+        let mut token = match self.peek_char() {
+            Some(';') => single_char_token!(TokenKind::SemiColon),
             Some(',') => single_char_token!(TokenKind::Comma),
+            Some('(') => single_char_token!(TokenKind::ParenL),
             Some(')') => single_char_token!(TokenKind::ParenR),
             Some('[') => single_char_token!(TokenKind::SquareL),
             Some(']') => single_char_token!(TokenKind::SquareR),
@@ -716,22 +718,6 @@ impl<'a> Iterator for Lexer<'a> {
                 ]
             )),
 
-            // FIXME: find a more sane way to pass annotation to function call
-            // without using the open parenthesis token; if that happens,
-            // ; can go back to being single_char_token and we can clear
-            // last annotation after every token (right before returning).
-            // identifier_or_keyword could also go back to calling take
-            // directly instead of passing a mutable reference
-            Some(';') => {
-                self.last_annotation.take(); // clear
-                single_char_token!(TokenKind::SemiColon)
-            }
-            Some('(') => Token {
-                kind: TokenKind::ParenL,
-                span: self.read_span().unwrap(),
-                annotation: self.last_annotation.take().map(Box::new),
-            },
-
             // TODO: support floats starting with dot (e.g., `.3`)
             // (this is not trivial since it conflicts with TokenKind::Period)
             Some(ch) if ch.is_ascii_digit() => match self.number_literal() {
@@ -753,6 +739,17 @@ impl<'a> Iterator for Lexer<'a> {
         };
 
         self.last_token_kind = Some(token.kind.clone());
+
+        // FIXME: find a more sane way to pass annotation to function call
+        // and short var decl without using these punctuation tokens; if
+        // that happens, we can clear last annotation after every token
+        // (right before returning). identifier_or_keyword could also go
+        // back to calling take directly instead of passing a mutable reference
+        if let TokenKind::ColonAssign | TokenKind::ParenL = token.kind {
+            token.annotation = self.last_annotation.take().map(Box::new);
+        } else if token.kind == TokenKind::SemiColon {
+            self.last_annotation.take(); // clear
+        }
 
         Some(Ok(token))
     }
