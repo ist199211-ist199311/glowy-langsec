@@ -6,6 +6,7 @@ use parser::{
 use super::{
     explicit::visit_assignment,
     exprs::{find_expr_location, visit_expr},
+    funcs::visit_call,
     visit_statement,
 };
 use crate::{
@@ -81,6 +82,8 @@ pub fn visit_incdec<'a>(
     )
 }
 
-pub fn visit_go<'a>(context: &mut VisitFileContext<'a, '_>, expr: &CallNode<'a>) {
-    todo!()
+pub fn visit_go<'a>(context: &mut VisitFileContext<'a, '_>, call: &CallNode<'a>) {
+    // for our purposes, this is just a regular function call
+
+    visit_call(context, call);
 }
