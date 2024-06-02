@@ -22,6 +22,7 @@ pub fn visit_function_decl<'a>(
                 context.current_package(),
                 id.clone(),
                 None, // TODO: make label depend on calls to function
+                false,
             )) {
                 context.report_error(
                     id.location(),

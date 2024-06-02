@@ -163,15 +163,26 @@ fn get_diagnostic_for_error<'a>(
             .with_labels(vec![Label::primary(file, location).with_message(format!(
                 "cannot assign {right} expression(s) to assign to {left} left-value(s)",
             ))])
-            .with_notes(vec![
-                "note: this (invalid Go) assignment will be ignored".to_owned()
-            ]),
+            .with_notes(vec![s!(
+                "note: this (invalid Go) assignment will be ignored"
+            )]),
         AnalysisError::InvalidLeftValue { file, location } => Diagnostic::warning()
             .with_code("W005")
             .with_message(s!("invalid left-value in assignment"))
-            .with_labels(vec![Label::primary(file, location)
-                .with_message(format!("can only assign to identifiers",))])
-            .with_notes(vec!["note: this assignment will be ignored".to_owned()]),
+            .with_labels(vec![
+                Label::primary(file, location).with_message(s!("can only assign to identifiers"))
+            ])
+            .with_notes(vec![s!("note: this assignment will be ignored")]),
+        AnalysisError::ImmutableLeftValue { file, symbol } => Diagnostic::warning()
+            .with_code("W006")
+            .with_message(s!("immutable left-value in assignment"))
+            .with_labels(vec![Label::primary(file, symbol.location()).with_message(
+                format!(
+                    "can only assign to variables, but `{}` is immutable",
+                    symbol.content()
+                ),
+            )])
+            .with_notes(vec![s!("note: this assignment will be ignored")]),
     }
 }
 

@@ -13,9 +13,21 @@ use crate::{
     symbols::Symbol,
 };
 
+pub fn visit_binding_decl<'a>(
+    context: &mut VisitFileContext<'a, '_>,
+    specs: &Vec<BindingDeclSpecNode<'a>>,
+    mutable: bool,
+    annotation: &Option<Box<Annotation<'a>>>,
+) {
+    for spec in specs {
+        visit_binding_decl_spec(context, spec, mutable, annotation);
+    }
+}
+
 pub fn visit_binding_decl_spec<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &BindingDeclSpecNode<'a>,
+    mutable: bool,
     annotation: &Option<Box<Annotation<'a>>>,
 ) {
     for (name, expr) in &node.mapping {
@@ -76,7 +88,7 @@ pub fn visit_binding_decl_spec<'a>(
         );
 
         let new_symbol =
-            Symbol::new_with_package(context.current_package(), name.clone(), backtrace);
+            Symbol::new_with_package(context.current_package(), name.clone(), backtrace, mutable);
         if let Some(prev_symbol) = context.symbol_table.create_symbol(new_symbol) {
             context.report_error(
                 name.location(),
@@ -137,7 +149,19 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
         let symbol = if let ExprNode::Name(name) = lhs {
             // TODO: support package
             if let Some(sym) = context.symbol_table.get_symbol_mut(name.id.content()) {
-                sym
+                if sym.mutable() {
+                    sym
+                } else {
+                    context.report_error(
+                        name.id.location(),
+                        AnalysisError::ImmutableLeftValue {
+                            file,
+                            symbol: name.id.clone(),
+                        },
+                    );
+
+                    return;
+                }
             } else {
                 context.report_error(
                     name.id.location(),

@@ -47,6 +47,10 @@ pub enum AnalysisError<'a> {
         file: usize,
         location: Location,
     },
+    ImmutableLeftValue {
+        file: usize,
+        symbol: Span<'a>,
+    },
 
     // IFC errors
     InsecureFlow {

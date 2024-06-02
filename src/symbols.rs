@@ -82,6 +82,7 @@ pub struct Symbol<'a> {
     package: Option<&'a str>, // for qualified operand names
     name: Span<'a>,
     label_backtrace: Option<LabelBacktrace<'a>>,
+    mutable: bool,
 }
 
 impl<'a> Symbol<'a> {
@@ -89,11 +90,13 @@ impl<'a> Symbol<'a> {
         package: &'a str,
         name: Span<'a>,
         label_backtrace: Option<LabelBacktrace<'a>>,
+        mutable: bool,
     ) -> Symbol<'a> {
         Symbol {
             package: Some(package),
             name,
             label_backtrace,
+            mutable,
         }
     }
 
@@ -115,5 +118,9 @@ impl<'a> Symbol<'a> {
 
     pub fn set_bottom(&mut self) {
         self.label_backtrace = None
+    }
+
+    pub fn mutable(&self) -> bool {
+        self.mutable
     }
 }

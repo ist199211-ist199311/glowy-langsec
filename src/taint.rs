@@ -1,4 +1,4 @@
-use explicit::{visit_assignment, visit_binding_decl_spec, visit_short_var_decl};
+use explicit::{visit_assignment, visit_binding_decl, visit_short_var_decl};
 use exprs::visit_expr;
 use funcs::{visit_function_decl, visit_return};
 use implicit::{visit_go, visit_if, visit_incdec};
@@ -40,19 +40,11 @@ pub fn visit_source_file<'a>(
 fn visit_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &DeclNode<'a>) {
     match node {
         DeclNode::Const {
-            specs,
-            location,
-            annotation,
-        }
-        | DeclNode::Var {
-            specs,
-            location,
-            annotation,
-        } => {
-            for spec in specs {
-                visit_binding_decl_spec(context, spec, annotation);
-            }
-        }
+            specs, annotation, ..
+        } => visit_binding_decl(context, specs, false, annotation),
+        DeclNode::Var {
+            specs, annotation, ..
+        } => visit_binding_decl(context, specs, true, annotation),
         DeclNode::Function(func_node) => {
             visit_function_decl(context, func_node);
         }
