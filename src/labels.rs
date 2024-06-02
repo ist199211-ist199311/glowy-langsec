@@ -171,11 +171,7 @@ impl<'a> LabelBacktrace<'a> {
 
         // if there is only one child
         if let [child] = children.as_slice() {
-            if child.label == label
-                && child.kind == kind
-                && child.location == location
-                && child.symbol == symbol
-            {
+            if child.label == label && child.location == location && child.symbol == symbol {
                 // avoid multiple repeated backtraces to the same symbol
                 return Some(child.clone());
             }
