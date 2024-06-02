@@ -71,7 +71,20 @@ pub fn visit_indexing<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &IndexingNode<'a>,
 ) -> Option<LabelBacktrace<'a>> {
-    todo!()
+    let backtrace_expr = visit_expr(context, &node.expr);
+    let backtrace_index = visit_expr(context, &node.index);
+
+    match (&backtrace_expr, &backtrace_index) {
+        (None, None) => None,
+        (Some(_), None) => backtrace_expr,
+        (None, Some(_)) => backtrace_index,
+        (Some(left), Some(right)) => Some(left.union(
+            right,
+            LabelBacktraceKind::Expression,
+            node.location.clone(),
+            None,
+        )),
+    }
 }
 
 pub fn find_expr_location(node: &ExprNode<'_>) -> Option<Location> {
