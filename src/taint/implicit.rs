@@ -3,14 +3,14 @@ use parser::ast::{CallNode, ElseNode, ExprNode, IfNode};
 use super::{exprs::visit_expr, visit_statement};
 use crate::{
     context::VisitFileContext,
-    labels::{LabelBacktrace, LabelBacktraceType},
+    labels::{LabelBacktrace, LabelBacktraceKind},
 };
 
 pub fn visit_if<'a>(context: &mut VisitFileContext<'a, '_>, node: &IfNode<'a>) {
     let pushed = if let Some(backtrace) = visit_expr(context, &node.cond) {
         context.push_branch_label(
             LabelBacktrace::new(
-                LabelBacktraceType::Branch,
+                LabelBacktraceKind::Branch,
                 backtrace.file(),
                 backtrace.location().clone(),
                 None,

@@ -115,7 +115,7 @@ impl<'a> From<&Option<LabelBacktrace<'a>>> for Label<'a> {
 /// - Labels of children are always a subset of their parent's label.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LabelBacktrace<'a> {
-    r#type: LabelBacktraceType,
+    kind: LabelBacktraceKind,
     file_id: usize,
     location: Location,
     symbol: Option<Span<'a>>,
@@ -126,7 +126,7 @@ pub struct LabelBacktrace<'a> {
 impl<'a> LabelBacktrace<'a> {
     pub fn new_explicit_annotation(file_id: usize, symbol: Span<'a>, label: Label<'a>) -> Self {
         Self {
-            r#type: LabelBacktraceType::ExplicitAnnotation,
+            kind: LabelBacktraceKind::ExplicitAnnotation,
             file_id,
             location: symbol.location(),
             symbol: Some(symbol),
@@ -136,7 +136,7 @@ impl<'a> LabelBacktrace<'a> {
     }
 
     pub fn new<'b>(
-        r#type: LabelBacktraceType,
+        kind: LabelBacktraceKind,
         file_id: usize,
         location: Location,
         symbol: Option<Span<'a>>,
@@ -172,7 +172,7 @@ impl<'a> LabelBacktrace<'a> {
         // if there is only one child
         if let [child] = children.as_slice() {
             if child.label == label
-                && child.r#type == r#type
+                && child.kind == kind
                 && child.location == location
                 && child.symbol == symbol
             {
@@ -182,7 +182,7 @@ impl<'a> LabelBacktrace<'a> {
         };
 
         Some(LabelBacktrace {
-            r#type,
+            kind,
             file_id,
             location,
             symbol,
@@ -200,7 +200,7 @@ impl<'a> LabelBacktrace<'a> {
             None
         } else {
             Some(Self {
-                r#type: self.r#type,
+                kind: self.kind,
                 file_id: self.file_id,
                 location: self.location.clone(),
                 symbol: self.symbol.clone(),
@@ -216,7 +216,7 @@ impl<'a> LabelBacktrace<'a> {
 
     pub fn with_child(&self, child: &LabelBacktrace<'a>) -> LabelBacktrace<'a> {
         Self::new(
-            self.r#type,
+            self.kind,
             self.file_id,
             self.location.clone(),
             self.symbol.clone(),
@@ -229,12 +229,12 @@ impl<'a> LabelBacktrace<'a> {
     pub fn union(
         &self,
         other: &LabelBacktrace<'a>,
-        with_type: LabelBacktraceType,
+        with_kind: LabelBacktraceKind,
         at_location: Location,
         symbol: Option<Span<'a>>,
     ) -> LabelBacktrace<'a> {
         Self::new(
-            with_type,
+            with_kind,
             self.file_id, // FIXME: this is not necessarily true...
             at_location,
             symbol,
@@ -260,8 +260,8 @@ impl<'a> LabelBacktrace<'a> {
         self.file_id
     }
 
-    pub fn r#type(&self) -> LabelBacktraceType {
-        self.r#type
+    pub fn kind(&self) -> LabelBacktraceKind {
+        self.kind
     }
 
     pub fn children(&self) -> &[LabelBacktrace<'a>] {
@@ -270,7 +270,7 @@ impl<'a> LabelBacktrace<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LabelBacktraceType {
+pub enum LabelBacktraceKind {
     ExplicitAnnotation,
     Assignment,
     Expression,

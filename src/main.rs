@@ -11,7 +11,7 @@ use codespan_reporting::{
 use glowy::{
     analyze_files,
     errors::AnalysisError,
-    labels::{LabelBacktrace, LabelBacktraceType},
+    labels::{LabelBacktrace, LabelBacktraceKind},
 };
 use parser::Diagnostics;
 
@@ -212,29 +212,29 @@ fn flatten_label_backtrace(backtrace: &LabelBacktrace) -> Vec<Label<usize>> {
     }
 
     let label = Label::secondary(backtrace.file(), backtrace.location().clone()).with_message(
-        match backtrace.r#type() {
-            LabelBacktraceType::ExplicitAnnotation => format!(
+        match backtrace.kind() {
+            LabelBacktraceKind::ExplicitAnnotation => format!(
                 "{} has been explicitly annotated with label {}",
                 symbol(backtrace, "symbol"),
                 backtrace.label()
             ),
-            LabelBacktraceType::Assignment => format!(
+            LabelBacktraceKind::Assignment => format!(
                 "{} has been assigned a value that has label {}",
                 symbol(backtrace, "symbol"),
                 backtrace.label()
             ),
-            LabelBacktraceType::Expression => format!(
+            LabelBacktraceKind::Expression => format!(
                 "{} has label {}",
                 symbol(backtrace, "expression"),
                 backtrace.label()
             ),
-            LabelBacktraceType::Branch => {
+            LabelBacktraceKind::Branch => {
                 format!("execution branch has label {}", backtrace.label())
             }
-            LabelBacktraceType::Return => {
+            LabelBacktraceKind::Return => {
                 format!("function returns with label {}", backtrace.label())
             }
-            LabelBacktraceType::FunctionCall => format!(
+            LabelBacktraceKind::FunctionCall => format!(
                 "function call has return value with label {}",
                 backtrace.label()
             ),

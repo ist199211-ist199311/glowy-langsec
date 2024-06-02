@@ -9,7 +9,7 @@ use super::exprs::{find_expr_location, visit_expr};
 use crate::{
     context::VisitFileContext,
     errors::{AnalysisError, InsecureFlowKind},
-    labels::{Label, LabelBacktrace, LabelBacktraceType},
+    labels::{Label, LabelBacktrace, LabelBacktraceKind},
     symbols::Symbol,
 };
 
@@ -61,7 +61,7 @@ pub fn visit_binding_decl_spec<'a>(
 
                     if let None | Some(Ordering::Greater) = label.partial_cmp(&sink_label) {
                         let backtrace = LabelBacktrace::new(
-                            LabelBacktraceType::Assignment,
+                            LabelBacktraceKind::Assignment,
                             context.file(),
                             find_expr_location(expr).unwrap(), // guaranteed Some
                             None,
@@ -85,7 +85,7 @@ pub fn visit_binding_decl_spec<'a>(
         }
 
         let backtrace = LabelBacktrace::new(
-            LabelBacktraceType::Assignment,
+            LabelBacktraceKind::Assignment,
             context.file(),
             name.location(),
             Some(name.clone()),
@@ -238,7 +238,7 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
         } else {
             symbol.set_backtrace(
                 LabelBacktrace::new(
-                    LabelBacktraceType::Assignment,
+                    LabelBacktraceKind::Assignment,
                     file,
                     node.location.clone(),
                     Some(symbol.name().clone()),

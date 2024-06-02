@@ -6,7 +6,7 @@ use super::{exprs::visit_expr, visit_statement};
 use crate::{
     context::VisitFileContext,
     errors::{AnalysisError, InsecureFlowKind},
-    labels::{Label, LabelBacktrace, LabelBacktraceType},
+    labels::{Label, LabelBacktrace, LabelBacktraceKind},
     symbols::Symbol,
 };
 
@@ -59,7 +59,7 @@ pub fn visit_call<'a>(
         .collect();
 
     let backtrace = LabelBacktrace::new(
-        LabelBacktraceType::FunctionCall,
+        LabelBacktraceKind::FunctionCall,
         context.file(),
         node.location.clone(),
         None,

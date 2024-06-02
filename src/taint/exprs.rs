@@ -7,7 +7,7 @@ use super::funcs::visit_call;
 use crate::{
     context::VisitFileContext,
     errors::AnalysisError,
-    labels::{LabelBacktrace, LabelBacktraceType},
+    labels::{LabelBacktrace, LabelBacktraceKind},
 };
 
 pub fn visit_expr<'a>(
@@ -21,7 +21,7 @@ pub fn visit_expr<'a>(
             if let Some(symbol) = symbol {
                 symbol.backtrace().as_ref().map(|symbol_backtrace| {
                     LabelBacktrace::new(
-                        LabelBacktraceType::Expression,
+                        LabelBacktraceKind::Expression,
                         context.file(),
                         name.id.location(),
                         Some(name.id.clone()),
@@ -58,7 +58,7 @@ pub fn visit_expr<'a>(
                 (Some(_), None) => left,
                 (None, Some(_)) => right,
                 (Some(l), Some(r)) => {
-                    Some(l.union(r, LabelBacktraceType::Expression, location.clone(), None))
+                    Some(l.union(r, LabelBacktraceKind::Expression, location.clone(), None))
                 }
             }
         }
