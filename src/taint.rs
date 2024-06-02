@@ -47,7 +47,7 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
         }
         StatementNode::Send(_) => todo!(),
         StatementNode::Inc { operand, location } | StatementNode::Dec { operand, location } => {
-            visit_incdec(context, operand)
+            visit_incdec(context, operand, location)
         }
         StatementNode::Assignment(assignment) => visit_assignment(context, assignment),
         StatementNode::ShortVarDecl(decl) => visit_short_var_decl(context, decl),

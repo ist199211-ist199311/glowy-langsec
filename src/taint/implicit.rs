@@ -1,6 +1,9 @@
-use parser::ast::{CallNode, ElseNode, ExprNode, IfNode};
+use parser::{
+    ast::{AssignmentKind, AssignmentNode, CallNode, ElseNode, ExprNode, IfNode, LiteralNode},
+    Location,
+};
 
-use super::{exprs::visit_expr, visit_statement};
+use super::{explicit::visit_assignment, exprs::visit_expr, visit_statement};
 use crate::{
     context::VisitFileContext,
     labels::{LabelBacktrace, LabelBacktraceKind},
@@ -56,8 +59,22 @@ pub fn visit_if<'a>(context: &mut VisitFileContext<'a, '_>, node: &IfNode<'a>) {
 
 // TODO: visit_for
 
-pub fn visit_incdec<'a>(context: &mut VisitFileContext<'a, '_>, expr: &ExprNode<'a>) {
-    todo!()
+pub fn visit_incdec<'a>(
+    context: &mut VisitFileContext<'a, '_>,
+    operand: &ExprNode<'a>,
+    location: &Location,
+) {
+    // handled here as syntactic sugar for assignment
+
+    visit_assignment(
+        context,
+        &AssignmentNode {
+            kind: AssignmentKind::Sum, // can be anything but Simple
+            lhs: vec![operand.clone()],
+            rhs: vec![ExprNode::Literal(LiteralNode::Int(1))],
+            location: location.clone(),
+        },
+    )
 }
 
 pub fn visit_go<'a>(context: &mut VisitFileContext<'a, '_>, expr: &CallNode<'a>) {
