@@ -39,6 +39,12 @@ pub fn visit_binding_decl_spec<'a>(
             .unwrap_or(Label::Bottom);
         let mut backtraces = vec![];
 
+        let branch_backtrace = context.branch_backtrace().cloned();
+        label = label.union(&Label::from(&branch_backtrace));
+        if let Some(backtrace) = branch_backtrace {
+            backtraces.push(backtrace);
+        }
+
         if let Some(annotation) = annotation {
             match annotation.scope {
                 "label" => {
@@ -143,6 +149,7 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
         // otherwise we would use &mut context while also holding an immutable ref
         // to context (symbol)
         let rhs_backtrace = visit_expr(context, rhs);
+        let branch_backtrace = context.branch_backtrace().cloned();
         let file = context.file();
 
         // TODO: support more kinds of left values, e.g. indexing
@@ -187,23 +194,16 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
             return;
         };
 
-        let current_label = symbol
-            .backtrace()
-            .as_ref()
-            .map(LabelBacktrace::label)
-            .cloned()
-            .unwrap_or(Label::Bottom);
-        let rhs_label = rhs_backtrace
-            .as_ref()
-            .map(LabelBacktrace::label)
-            .cloned()
-            .unwrap_or(Label::Bottom);
+        let branch_label = Label::from(&branch_backtrace);
+        let current_label = Label::from(symbol.backtrace());
+        let rhs_label = Label::from(&rhs_backtrace);
 
         let label = if node.kind == AssignmentKind::Simple {
             rhs_label
         } else {
             current_label.union(&rhs_label)
         };
+        let label = label.union(&branch_label);
 
         if label == Label::Bottom {
             symbol.set_bottom();
@@ -217,7 +217,7 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
                     label,
                     // constructor will get rid of subsequent children if
                     // the ones before are is enough to cover the label
-                    [rhs_backtrace, symbol.backtrace().clone()]
+                    [rhs_backtrace, branch_backtrace, symbol.backtrace().clone()]
                         .iter()
                         .filter_map(Option::as_ref),
                 )

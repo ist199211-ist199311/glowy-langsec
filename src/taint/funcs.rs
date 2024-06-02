@@ -47,12 +47,15 @@ pub fn visit_call<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &CallNode<'a>,
 ) -> Option<LabelBacktrace<'a>> {
-    let mut label = Label::Bottom;
+    let branch_backtrace = context.branch_backtrace().cloned();
+
+    let mut label = Label::from(&branch_backtrace);
     let args_backtraces: Vec<_> = node
         .args
         .iter()
         .flat_map(|arg| visit_expr(context, arg))
         .inspect(|backtrace| label = label.union(backtrace.label()))
+        .chain(std::iter::once(branch_backtrace).flatten())
         .collect();
 
     let backtrace = LabelBacktrace::new(

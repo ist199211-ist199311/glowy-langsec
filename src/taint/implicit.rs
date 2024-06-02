@@ -1,11 +1,57 @@
-use parser::ast::{CallNode, ExprNode, IfNode};
+use parser::ast::{CallNode, ElseNode, ExprNode, IfNode};
 
-use super::exprs::visit_expr;
-use crate::context::VisitFileContext;
+use super::{exprs::visit_expr, visit_statement};
+use crate::{
+    context::VisitFileContext,
+    labels::{LabelBacktrace, LabelBacktraceType},
+};
 
 pub fn visit_if<'a>(context: &mut VisitFileContext<'a, '_>, node: &IfNode<'a>) {
-    let label = visit_expr(context, &node.cond);
-    todo!()
+    let pushed = if let Some(backtrace) = visit_expr(context, &node.cond) {
+        context.push_branch_label(
+            LabelBacktrace::new(
+                LabelBacktraceType::Branch,
+                backtrace.file(),
+                backtrace.location().clone(),
+                None,
+                backtrace.label().clone(),
+                &[backtrace],
+            )
+            .unwrap(), // safe since the original backtrace exists
+        );
+
+        true
+    } else {
+        false
+    };
+
+    // Go spec: each if, for and switch is considered to be in its own implicit
+    // block
+    context.symbol_table.push();
+
+    context.symbol_table.push();
+    for statement in &node.then {
+        visit_statement(context, statement);
+    }
+    context.symbol_table.pop();
+
+    match &node.otherwise {
+        Some(ElseNode::If(else_if)) => visit_if(context, else_if),
+        Some(ElseNode::Block(stmts)) => {
+            context.symbol_table.push();
+            for stmt in stmts {
+                visit_statement(context, stmt);
+            }
+            context.symbol_table.pop();
+        }
+        None => {}
+    }
+
+    context.symbol_table.pop(); // implicit block
+
+    if pushed {
+        context.pop_branch_label();
+    }
 }
 
 // TODO: visit_for

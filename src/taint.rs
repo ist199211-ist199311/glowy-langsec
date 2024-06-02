@@ -66,9 +66,11 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
         StatementNode::Decl(decl) => visit_decl(context, decl),
         StatementNode::If(r#if) => visit_if(context, r#if),
         StatementNode::Block(stmts) => {
+            context.symbol_table.push();
             for statement in stmts {
                 visit_statement(context, statement);
             }
+            context.symbol_table.pop();
         }
         StatementNode::Return { exprs, location } => visit_return(context, exprs),
         StatementNode::Go(expr) => match expr {

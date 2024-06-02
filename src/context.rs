@@ -2,6 +2,7 @@ use std::{collections::HashMap, ops::Range};
 
 use crate::{
     errors::{AnalysisError, ErrorLocation},
+    labels::LabelBacktrace,
     symbols::{SymbolScope, SymbolTable},
 };
 
@@ -42,6 +43,7 @@ pub struct VisitFileContext<'a, 'b> {
     pub symbol_table: SymbolTable<'a, 'b>,
     current_package: &'a str,
     pub errors: HashMap<ErrorLocation, AnalysisError<'a>>,
+    branch_labels: Vec<LabelBacktrace<'a>>, // stack, for implicit flows
 }
 
 impl<'a, 'b> VisitFileContext<'a, 'b> {
@@ -56,6 +58,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
             symbol_table: SymbolTable::new_from_global(&analysis_context.global_scope),
             current_package: package,
             errors: HashMap::new(),
+            branch_labels: vec![],
         }
     }
 
@@ -79,5 +82,24 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
 
     pub fn symtab(&self) -> &SymbolTable<'a, 'b> {
         &self.symbol_table
+    }
+
+    pub fn branch_backtrace(&self) -> Option<&LabelBacktrace<'a>> {
+        self.branch_labels.last()
+    }
+
+    pub fn push_branch_label(&mut self, backtrace: LabelBacktrace<'a>) {
+        // merge with existing branch label
+        let composite = if let Some(existing) = self.branch_backtrace() {
+            backtrace.with_child(existing)
+        } else {
+            backtrace
+        };
+
+        self.branch_labels.push(composite);
+    }
+
+    pub fn pop_branch_label(&mut self) {
+        self.branch_labels.pop();
     }
 }

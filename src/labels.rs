@@ -98,6 +98,15 @@ impl<'a> Display for Label<'a> {
     }
 }
 
+impl<'a> From<&Option<LabelBacktrace<'a>>> for Label<'a> {
+    fn from(opt: &Option<LabelBacktrace<'a>>) -> Self {
+        opt.as_ref()
+            .map(LabelBacktrace::label)
+            .cloned()
+            .unwrap_or(Label::Bottom)
+    }
+}
+
 /// Keeps track of where labels come from.
 /// This represents a tree, where each node has children indicating where
 /// the labels come from.
