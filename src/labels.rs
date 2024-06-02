@@ -2,11 +2,26 @@ use std::{cmp::Ordering, collections::BTreeSet, fmt::Display};
 
 use parser::{Location, Span};
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum LabelTag<'a> {
+    Concrete(&'a str),
+    Synthetic(usize),
+}
+
+impl<'a> Display for LabelTag<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LabelTag::Concrete(tag) => write!(f, "{}", tag),
+            LabelTag::Synthetic(id) => write!(f, "<{}>", id),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Label<'a> {
     Top,
     // This must never have an empty set (use Bottom instead)
-    Parts(BTreeSet<&'a str>),
+    Parts(BTreeSet<LabelTag<'a>>),
     Bottom,
 }
 
@@ -15,7 +30,7 @@ impl<'a> Label<'a> {
         if parts.is_empty() {
             Label::Bottom
         } else {
-            let parts = BTreeSet::from_iter(parts.iter().cloned());
+            let parts = BTreeSet::from_iter(parts.iter().map(|part| LabelTag::Concrete(part)));
             Label::Parts(parts)
         }
     }
@@ -291,14 +306,17 @@ pub enum LabelBacktraceKind {
 mod tests {
     use std::{cmp::Ordering, collections::BTreeSet};
 
-    use super::Label;
+    use super::{Label, LabelTag};
 
     #[test]
     fn label_constructor() {
         assert_eq!(Label::from_parts(&[]), Label::Bottom);
         assert_eq!(
             Label::from_parts(&["lbl1", "lbl2"]),
-            Label::Parts(BTreeSet::from(["lbl1", "lbl2"]))
+            Label::Parts(BTreeSet::from([
+                LabelTag::Concrete("lbl1"),
+                LabelTag::Concrete("lbl2")
+            ]))
         );
     }
 
