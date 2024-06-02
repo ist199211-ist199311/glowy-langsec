@@ -1,4 +1,5 @@
 use decls::try_parse_top_level_decl;
+use imports::try_parse_import;
 
 use crate::{
     ast::{PackageClauseNode, SourceFileNode},
@@ -9,6 +10,7 @@ use crate::{
 
 mod decls;
 mod exprs;
+mod imports;
 mod stmts;
 mod types;
 
@@ -62,8 +64,13 @@ pub fn parse_source_file<'a>(s: &mut TokenStream<'a>) -> PResult<'a, SourceFileN
 
     expect(s, TokenKind::SemiColon, None)?;
 
-    let mut top_level_decls = vec![];
+    let mut imports = vec![];
+    while let Some(import) = try_parse_import(s)? {
+        imports.push(import);
+        expect(s, TokenKind::SemiColon, None)?;
+    }
 
+    let mut top_level_decls = vec![];
     while let Some(decl) = try_parse_top_level_decl(s)? {
         top_level_decls.push(decl);
         expect(s, TokenKind::SemiColon, None)?;
@@ -71,6 +78,7 @@ pub fn parse_source_file<'a>(s: &mut TokenStream<'a>) -> PResult<'a, SourceFileN
 
     Ok(SourceFileNode {
         package_clause,
+        imports,
         top_level_decls,
     })
 }

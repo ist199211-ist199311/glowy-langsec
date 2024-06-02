@@ -3,13 +3,24 @@ use crate::{Annotation, Span};
 #[derive(Debug, PartialEq)]
 pub struct SourceFileNode<'a> {
     pub package_clause: PackageClauseNode<'a>,
-    // TODO: pub imports: Vec<ImportNode<'a>>,
+    pub imports: Vec<ImportNode<'a>>,
     pub top_level_decls: Vec<DeclNode<'a>>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct PackageClauseNode<'a> {
     pub id: Span<'a>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ImportNode<'a> {
+    pub specs: Vec<ImportSpecNode<'a>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ImportSpecNode<'a> {
+    pub identifier: Option<Span<'a>>,
+    pub path: String,
 }
 
 #[derive(Debug, PartialEq)]
