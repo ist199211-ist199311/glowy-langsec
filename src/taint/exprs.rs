@@ -74,7 +74,7 @@ pub fn visit_indexing<'a>(
     todo!()
 }
 
-pub fn find_expr_location<'a>(node: &ExprNode<'a>) -> Option<Location> {
+pub fn find_expr_location(node: &ExprNode<'_>) -> Option<Location> {
     let loc = match node {
         ExprNode::Name(OperandNameNode { id, .. }) => id.location(),
         ExprNode::Literal(_) => return None,

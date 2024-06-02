@@ -4,28 +4,17 @@ use parser::Span;
 
 use crate::labels::LabelBacktrace;
 
-pub type SymbolScope<'a> = HashMap<&'a str, Symbol<'a>>;
+type SymbolScope<'a> = HashMap<&'a str, Symbol<'a>>;
 
 // TODO: review this for multiple file support
 #[derive(Debug, Clone)]
-pub struct SymbolTable<'a, 'b> {
-    parent_scope: Option<&'b SymbolScope<'a>>,
+pub struct SymbolTable<'a> {
     scopes: Vec<SymbolScope<'a>>,
 }
 
-impl<'a, 'b> SymbolTable<'a, 'b> {
-    // TODO needed?
-    #[allow(dead_code)]
+impl<'a> SymbolTable<'a> {
     pub fn new() -> Self {
         SymbolTable {
-            parent_scope: None,
-            scopes: vec![SymbolScope::new()],
-        }
-    }
-
-    pub fn new_from_global(parent_scope: &'b SymbolScope<'a>) -> Self {
-        SymbolTable {
-            parent_scope: Some(parent_scope),
             scopes: vec![SymbolScope::new()],
         }
     }
@@ -39,30 +28,18 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
         scope.insert(symbol.name.content(), symbol)
     }
 
-    pub fn get_symbol<'c>(&'c self, symbol_name: &str) -> Option<&'c Symbol<'a>> {
+    pub fn get_symbol<'b>(&'b self, symbol_name: &str) -> Option<&'b Symbol<'a>> {
         self.scopes
             .iter()
             .rev()
             .find_map(|context| context.get(symbol_name))
-            .or_else(|| {
-                self.parent_scope
-                    .and_then(|context| context.get(symbol_name))
-            })
     }
 
-    pub fn get_symbol_mut<'c>(&'c mut self, symbol_name: &str) -> Option<&'c mut Symbol<'a>> {
-        // FIXME: this does not support globals because cannot get mut ref
+    pub fn get_symbol_mut<'b>(&'b mut self, symbol_name: &str) -> Option<&'b mut Symbol<'a>> {
         self.scopes
             .iter_mut()
             .rev()
             .find_map(|context| context.get_mut(symbol_name))
-    }
-
-    pub fn get_topmost_scope(self) -> SymbolScope<'a> {
-        self.scopes
-            .into_iter()
-            .next()
-            .expect("symbol table should always have at least one scope")
     }
 
     pub fn push(&mut self) {
@@ -71,7 +48,7 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
 
     pub fn pop(&mut self) {
         if self.scopes.len() <= 1 {
-            panic!("cannot pop the last symbol scope in the symbol table");
+            panic!("cannot pop the topmost symbol scope in the symbol table");
         }
         self.scopes.pop();
     }

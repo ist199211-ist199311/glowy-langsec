@@ -3,15 +3,14 @@ use std::{collections::HashMap, ops::Range};
 use crate::{
     errors::{AnalysisError, ErrorLocation},
     labels::LabelBacktrace,
-    symbols::{SymbolScope, SymbolTable},
+    symbols::SymbolTable,
 };
 
 #[derive(Debug)]
 pub struct AnalysisContext<'a> {
-    /// Read-only view of the global scope (variables).
-    /// Updated with the context in the symbol table after visiting
-    /// each file.
-    pub global_scope: SymbolScope<'a>,
+    /// Symbols of the entire program, where the topmost scope represents
+    /// the global scope.
+    symbol_table: SymbolTable<'a>,
     #[allow(dead_code)]
     /// Map of ((package, name), function)
     functions: HashMap<(&'a str, &'a str), FunctionContext>,
@@ -23,7 +22,7 @@ pub struct AnalysisContext<'a> {
 impl<'a> AnalysisContext<'a> {
     pub fn new() -> Self {
         Self {
-            global_scope: SymbolScope::new(),
+            symbol_table: SymbolTable::new(),
             functions: HashMap::new(),
             errors: HashMap::new(),
         }
@@ -38,26 +37,22 @@ pub struct FunctionContext {
 
 #[derive(Debug)]
 pub struct VisitFileContext<'a, 'b> {
-    analysis_context: &'b AnalysisContext<'a>,
+    analysis_context: &'b mut AnalysisContext<'a>,
     file_id: usize,
-    pub symbol_table: SymbolTable<'a, 'b>,
     current_package: &'a str,
-    pub errors: HashMap<ErrorLocation, AnalysisError<'a>>,
     branch_labels: Vec<LabelBacktrace<'a>>, // stack, for implicit flows
 }
 
 impl<'a, 'b> VisitFileContext<'a, 'b> {
     pub fn new(
-        analysis_context: &'b AnalysisContext<'a>,
+        analysis_context: &'b mut AnalysisContext<'a>,
         file_id: usize,
         package: &'a str,
     ) -> Self {
         VisitFileContext {
             analysis_context,
             file_id,
-            symbol_table: SymbolTable::new_from_global(&analysis_context.global_scope),
             current_package: package,
-            errors: HashMap::new(),
             branch_labels: vec![],
         }
     }
@@ -65,11 +60,10 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
     pub fn report_error(&mut self, location: Range<usize>, error: AnalysisError<'a>) {
         let error_location = ErrorLocation::new(self.file_id, location);
 
-        if !self.analysis_context.errors.contains_key(&error_location)
-            && !self.errors.contains_key(&error_location)
-        {
-            self.errors.insert(error_location, error);
-        }
+        self.analysis_context
+            .errors
+            .entry(error_location)
+            .or_insert(error);
     }
 
     pub fn file(&self) -> usize {
@@ -80,8 +74,12 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         self.current_package
     }
 
-    pub fn symtab(&self) -> &SymbolTable<'a, 'b> {
-        &self.symbol_table
+    pub fn symtab(&self) -> &SymbolTable<'a> {
+        &self.analysis_context.symbol_table
+    }
+
+    pub fn symtab_mut(&mut self) -> &mut SymbolTable<'a> {
+        &mut self.analysis_context.symbol_table
     }
 
     pub fn branch_backtrace(&self) -> Option<&LabelBacktrace<'a>> {

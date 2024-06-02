@@ -27,27 +27,27 @@ pub fn visit_if<'a>(context: &mut VisitFileContext<'a, '_>, node: &IfNode<'a>) {
 
     // Go spec: each if, for and switch is considered to be in its own implicit
     // block
-    context.symbol_table.push();
+    context.symtab_mut().push();
 
-    context.symbol_table.push();
+    context.symtab_mut().push();
     for statement in &node.then {
         visit_statement(context, statement);
     }
-    context.symbol_table.pop();
+    context.symtab_mut().pop();
 
     match &node.otherwise {
         Some(ElseNode::If(else_if)) => visit_if(context, else_if),
         Some(ElseNode::Block(stmts)) => {
-            context.symbol_table.push();
+            context.symtab_mut().push();
             for stmt in stmts {
                 visit_statement(context, stmt);
             }
-            context.symbol_table.pop();
+            context.symtab_mut().pop();
         }
         None => {}
     }
 
-    context.symbol_table.pop(); // implicit block
+    context.symtab_mut().pop(); // implicit block
 
     if pushed {
         context.pop_branch_label();

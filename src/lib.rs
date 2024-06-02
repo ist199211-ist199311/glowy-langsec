@@ -30,12 +30,9 @@ pub fn analyze_files<'a>(
         return Err(errors);
     }
 
-    let mut changed = true;
-    while changed {
-        changed = false;
-        for (file_id, node) in &parsed {
-            changed |= visit_source_file(&mut context, *file_id, node);
-        }
+    // TODO properly support multiple files
+    for (file_id, node) in &parsed {
+        visit_source_file(&mut context, *file_id, node);
     }
 
     if context.errors.is_empty() {

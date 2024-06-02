@@ -95,7 +95,7 @@ pub fn visit_binding_decl_spec<'a>(
 
         let new_symbol =
             Symbol::new_with_package(context.current_package(), name.clone(), backtrace, mutable);
-        if let Some(prev_symbol) = context.symbol_table.create_symbol(new_symbol) {
+        if let Some(prev_symbol) = context.symtab_mut().create_symbol(new_symbol) {
             context.report_error(
                 name.location(),
                 AnalysisError::Redeclaration {
@@ -183,7 +183,7 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
         // TODO: support more kinds of left values, e.g. indexing
         let symbol = if let ExprNode::Name(name) = lhs {
             // TODO: support package
-            if let Some(sym) = context.symbol_table.get_symbol_mut(name.id.content()) {
+            if let Some(sym) = context.symtab_mut().get_symbol_mut(name.id.content()) {
                 if sym.mutable() {
                     sym
                 } else {

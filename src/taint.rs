@@ -15,26 +15,14 @@ pub fn visit_source_file<'a>(
     context: &mut AnalysisContext<'a>,
     file_id: usize,
     node: &SourceFileNode<'a>,
-) -> bool {
+) {
     let package = node.package_clause.id.content();
-
-    let mut changed = false;
 
     let mut visit_context = VisitFileContext::new(context, file_id, package);
 
     for decl in &node.top_level_decls {
         visit_decl(&mut visit_context, decl);
     }
-
-    // TODO this is a mess, should be moved to the impl of AnalysisContext, but
-    // the borrow checker doesn't like that
-    let global_symbol_scope = visit_context.symbol_table.get_topmost_scope();
-    context.errors.extend(visit_context.errors);
-    // TODO: broken; needs to compare labels individually
-    // changed |= !global_symbol_context.is_empty();
-    context.global_scope.extend(global_symbol_scope);
-
-    changed
 }
 
 fn visit_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &DeclNode<'a>) {
@@ -66,11 +54,11 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
         StatementNode::Decl(decl) => visit_decl(context, decl),
         StatementNode::If(r#if) => visit_if(context, r#if),
         StatementNode::Block(stmts) => {
-            context.symbol_table.push();
+            context.symtab_mut().push();
             for statement in stmts {
                 visit_statement(context, statement);
             }
-            context.symbol_table.pop();
+            context.symtab_mut().pop();
         }
         StatementNode::Return { exprs, location } => visit_return(context, exprs),
         StatementNode::Go(expr) => match expr {

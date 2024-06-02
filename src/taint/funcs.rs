@@ -14,12 +14,13 @@ pub fn visit_function_decl<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &FunctionDeclNode<'a>,
 ) {
-    context.symbol_table.push();
+    context.symtab_mut().push();
 
     for param in &node.signature.params {
         for id in &param.ids {
-            if let Some(prev_symbol) = context.symbol_table.create_symbol(Symbol::new_with_package(
-                context.current_package(),
+            let package = context.current_package();
+            if let Some(prev_symbol) = context.symtab_mut().create_symbol(Symbol::new_with_package(
+                package,
                 id.clone(),
                 None, // TODO: make label depend on calls to function
                 false,
@@ -40,7 +41,7 @@ pub fn visit_function_decl<'a>(
         visit_statement(context, statement);
     }
 
-    context.symbol_table.pop();
+    context.symtab_mut().pop();
 }
 
 pub fn visit_call<'a>(
