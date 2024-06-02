@@ -199,6 +199,15 @@ fn get_diagnostic_for_error<'a>(
             .with_notes(vec![s!(
                 "note: this (invalid Go) declaration will be ignored"
             )]),
+        AnalysisError::GoNotCall { file, location } => Diagnostic::warning()
+            .with_code("W008")
+            .with_message(s!("invalid go-statement of non-function-call"))
+            .with_labels(vec![Label::primary(file, location).with_message(s!(
+                "expected a function call, but found another expression"
+            ))])
+            .with_notes(vec![
+                s!("note: this (invalid Go) statement will be ignored"),
+            ]),
     }
 }
 

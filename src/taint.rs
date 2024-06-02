@@ -1,10 +1,13 @@
 use explicit::{visit_assignment, visit_binding_decl, visit_short_var_decl};
-use exprs::visit_expr;
+use exprs::{find_expr_location, visit_expr};
 use funcs::{visit_function_decl, visit_return};
 use implicit::{visit_go, visit_if, visit_incdec};
 use parser::ast::{DeclNode, ExprNode, SourceFileNode, StatementNode};
 
-use crate::context::{AnalysisContext, VisitFileContext};
+use crate::{
+    context::{AnalysisContext, VisitFileContext},
+    errors::AnalysisError,
+};
 
 mod explicit;
 mod exprs;
@@ -63,7 +66,18 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
         StatementNode::Return { exprs, location } => visit_return(context, exprs),
         StatementNode::Go(expr) => match expr {
             ExprNode::Call(call) => visit_go(context, call),
-            _ => panic!("invalid go statement; expected function call"), // TODO: don't panic
+            _ => {
+                // I hate this default, but there is no other way of dealing with literals...
+                let location = find_expr_location(expr).unwrap_or(0..usize::MAX);
+
+                context.report_error(
+                    location.clone(),
+                    AnalysisError::GoNotCall {
+                        file: context.file(),
+                        location,
+                    },
+                );
+            }
         },
     }
 }

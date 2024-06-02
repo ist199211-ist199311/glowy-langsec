@@ -57,6 +57,10 @@ pub enum AnalysisError<'a> {
         left: usize,
         right: usize,
     },
+    GoNotCall {
+        file: usize,
+        location: Location,
+    },
 
     // IFC errors
     InsecureFlow {
