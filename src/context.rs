@@ -28,10 +28,9 @@ impl<'a> AnalysisContext<'a> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct FunctionContext<'a> {
-    /// Map of (argument labels, (argument final labels, return value label))
-    outcomes: HashMap<Vec<Label<'a>>, FunctionOutcome<'a>>,
+    outcome: FunctionOutcome<'a>,
 }
 
 #[derive(Debug)]
@@ -124,26 +123,22 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         &self,
         package: &'a str,
         name: &'a str,
-        arg_labels: &[Label<'a>],
     ) -> Option<&FunctionOutcome<'a>> {
         self.analysis_context
             .functions
             .get(&(package, name))
-            .and_then(|func_context| func_context.outcomes.get(arg_labels))
+            .map(|func_context| &func_context.outcome)
     }
 
     pub fn set_function_outcome(
         &mut self,
         package: &'a str,
         name: &'a str,
-        arg_labels: Vec<Label<'a>>,
         outcome: FunctionOutcome<'a>,
     ) {
         self.analysis_context
             .functions
             .entry((package, name))
-            .or_default()
-            .outcomes
-            .insert(arg_labels, outcome);
+            .or_insert(FunctionContext { outcome });
     }
 }

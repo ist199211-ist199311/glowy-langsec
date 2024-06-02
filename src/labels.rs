@@ -35,6 +35,10 @@ impl<'a> Label<'a> {
         }
     }
 
+    pub fn from_synthetic_id(id: usize) -> Label<'a> {
+        Label::Parts(BTreeSet::from([LabelTag::Synthetic(id)]))
+    }
+
     pub fn union(&self, other: &Label<'a>) -> Label<'a> {
         match (self, other) {
             (Self::Top, _) => Self::Top,
@@ -346,6 +350,7 @@ pub enum LabelBacktraceKind {
     Assignment,
     Expression,
     Branch,
+    FunctionArgument,
     FunctionCall,
     Return,
 }

@@ -243,6 +243,11 @@ fn flatten_label_backtrace(backtrace: &LabelBacktrace) -> Vec<Label<usize>> {
             LabelBacktraceKind::Return => {
                 format!("function returns with label {}", backtrace.label())
             }
+            LabelBacktraceKind::FunctionArgument => format!(
+                "{} in function call has label {}",
+                symbol(backtrace, "argument"),
+                backtrace.label()
+            ),
             LabelBacktraceKind::FunctionCall => format!(
                 "function call has return value with label {}",
                 backtrace.label()

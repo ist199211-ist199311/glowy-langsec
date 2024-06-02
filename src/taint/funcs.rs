@@ -41,12 +41,23 @@ pub fn visit_function_decl<'a>(
     // TODO: support nested functions
     context.clear_return_backtraces();
 
+    let mut param_id = 0;
+
     for param in &node.signature.params {
         for id in &param.ids {
+            let param_backtrace = LabelBacktrace::new(
+                LabelBacktraceKind::FunctionArgument,
+                context.file(),
+                id.location(),
+                Some(id.clone()),
+                Label::from_synthetic_id(param_id),
+                &[],
+            );
+            param_id += 1;
             if let Some(prev_symbol) = context.symtab_mut().create_symbol(Symbol::new_with_package(
                 package,
                 id.clone(),
-                None, // TODO: make label depend on calls to function
+                param_backtrace,
                 false,
             )) {
                 context.report_error(
@@ -79,10 +90,7 @@ pub fn visit_function_decl<'a>(
     };
     context.clear_return_backtraces();
 
-    // TODO: make labels depend on calls to functions
-    let arg_labels = vec![Label::Bottom; node.signature.params.len()];
-
-    context.set_function_outcome(package, node.name.content(), arg_labels, outcome);
+    context.set_function_outcome(package, node.name.content(), outcome);
 
     context.symtab_mut().pop();
 }
@@ -139,7 +147,7 @@ pub fn visit_call<'a>(
 
     if let ExprNode::Name(name) = node.func.as_ref() {
         if let Some(outcome) =
-            context.get_function_outcome(context.current_package(), name.id.content(), &args_labels)
+            context.get_function_outcome(context.current_package(), name.id.content())
         {
             // TODO do something with outcome arguments...
             let label = outcome
@@ -154,7 +162,8 @@ pub fn visit_call<'a>(
                 None,
                 label,
                 &outcome.return_value,
-            );
+            )
+            .and_then(|backtrace| backtrace.replace_synthetic_tags(&args_labels));
         }
     }
 
