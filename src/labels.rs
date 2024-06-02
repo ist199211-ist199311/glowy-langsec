@@ -80,6 +80,33 @@ impl<'a> Label<'a> {
             (Self::Bottom, _) => Self::Bottom,
         }
     }
+
+    pub fn replace_synthetic_tags(&self, replacements: &[Label<'a>]) -> Label<'a> {
+        if let Label::Parts(parts) = self {
+            let mut concrete_parts = BTreeSet::new();
+            let mut synthetic_parts = vec![];
+
+            for part in parts {
+                if let LabelTag::Synthetic(id) = part {
+                    if *id < replacements.len() {
+                        synthetic_parts.push(*id);
+                        continue;
+                    }
+                }
+                concrete_parts.insert(part.clone());
+            }
+
+            synthetic_parts
+                .iter()
+                .fold(Label::Bottom, |acc, id| {
+                    // id has been checked to be within the slice's length
+                    acc.union(&replacements[*id])
+                })
+                .union(&Label::Parts(concrete_parts))
+        } else {
+            self.clone()
+        }
+    }
 }
 
 impl<'a> PartialOrd for Label<'a> {
@@ -265,6 +292,27 @@ impl<'a> LabelBacktrace<'a> {
             [self, other],
         )
         .unwrap() // safe because if self exists, label is not Bottom
+    }
+
+    pub fn replace_synthetic_tags(self, replacements: &[Label<'a>]) -> Option<Self> {
+        let new_label = self.label.replace_synthetic_tags(replacements);
+
+        if new_label == Label::Bottom {
+            None
+        } else {
+            Some(Self {
+                kind: self.kind,
+                file_id: self.file_id,
+                location: self.location,
+                symbol: self.symbol,
+                label: new_label,
+                children: self
+                    .children
+                    .into_iter()
+                    .filter_map(|child| child.replace_synthetic_tags(replacements))
+                    .collect(),
+            })
+        }
     }
 
     pub fn label(&self) -> &Label<'a> {
@@ -486,6 +534,38 @@ mod tests {
             Label::from_parts(&["lbl1", "lbl2"]),
             Label::from_parts(&["lbl1", "lbl3"]),
             None
+        );
+    }
+
+    #[test]
+    fn replace_synthetic_tags() {
+        let label_with_synthetic_parts = Label::Parts(BTreeSet::from([
+            LabelTag::Concrete("lbl1"),
+            LabelTag::Synthetic(0),
+            LabelTag::Synthetic(1),
+        ]));
+        let replacements = [
+            Label::Parts(BTreeSet::from([
+                LabelTag::Concrete("lbl1"),
+                LabelTag::Concrete("lbl2"),
+                LabelTag::Synthetic(0),
+            ])),
+            Label::Parts(BTreeSet::from([
+                LabelTag::Concrete("lbl2"),
+                LabelTag::Concrete("lbl3"),
+            ])),
+        ];
+
+        let expected = Label::Parts(BTreeSet::from([
+            LabelTag::Concrete("lbl1"),
+            LabelTag::Concrete("lbl2"),
+            LabelTag::Concrete("lbl3"),
+            LabelTag::Synthetic(0),
+        ]));
+
+        assert_eq!(
+            label_with_synthetic_parts.replace_synthetic_tags(&replacements),
+            expected
         );
     }
 }
