@@ -69,7 +69,7 @@ pub fn visit_call<'a>(
 
     if let Some(annotation) = &node.annotation {
         if annotation.scope == "sink" {
-            let sink_label = Label::from_parts(&annotation.labels);
+            let sink_label = Label::from_parts(&annotation.tags);
 
             if let None | Some(Ordering::Greater) = label.partial_cmp(&sink_label) {
                 context.report_error(

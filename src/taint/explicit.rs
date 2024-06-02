@@ -48,7 +48,7 @@ pub fn visit_binding_decl_spec<'a>(
         if let Some(annotation) = annotation {
             match annotation.scope {
                 "label" => {
-                    let annotation_label = Label::from_parts(&annotation.labels);
+                    let annotation_label = Label::from_parts(&annotation.tags);
                     label = label.union(&annotation_label);
                     backtraces.push(LabelBacktrace::new_explicit_annotation(
                         context.file(),
@@ -57,7 +57,7 @@ pub fn visit_binding_decl_spec<'a>(
                     ));
                 }
                 "sink" => {
-                    let sink_label = Label::from_parts(&annotation.labels);
+                    let sink_label = Label::from_parts(&annotation.tags);
 
                     if let None | Some(Ordering::Greater) = label.partial_cmp(&sink_label) {
                         let backtrace = LabelBacktrace::new(

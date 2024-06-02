@@ -111,8 +111,7 @@ impl<'a> Lexer<'a> {
             last_token_kind: None,
             queue: VecDeque::new(),
 
-            annotation_regex: Regex::new(r#"glowy::(?P<scope>\w+)::\{(?P<labels>[^}]*)\}"#)
-                .unwrap(),
+            annotation_regex: Regex::new(r#"glowy::(?P<scope>\w+)::\{(?P<tags>[^}]*)\}"#).unwrap(),
             last_annotation: None,
 
             enable_implicit_semicolon: true,
@@ -222,13 +221,13 @@ impl<'a> Lexer<'a> {
 
                     if let Some(captures) = self.annotation_regex.captures(text) {
                         let scope = &text[captures.name("scope").unwrap().range()];
-                        let labels = text[captures.name("labels").unwrap().range()]
+                        let tags = text[captures.name("tags").unwrap().range()]
                             .split(',')
                             .map(str::trim)
-                            .filter(|label| !label.is_empty())
+                            .filter(|tag| !tag.is_empty())
                             .collect();
 
-                        self.last_annotation = Some(Annotation { scope, labels });
+                        self.last_annotation = Some(Annotation { scope, tags });
                     }
                 }
                 Some('*') => {

@@ -145,5 +145,5 @@ impl<'a> Token<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Annotation<'a> {
     pub scope: &'a str,
-    pub labels: Vec<&'a str>,
+    pub tags: Vec<&'a str>,
 }
