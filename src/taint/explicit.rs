@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use parser::{
-    ast::{AssignmentNode, BindingDeclSpecNode, ShortVarDeclNode},
+    ast::{AssignmentKind, AssignmentNode, BindingDeclSpecNode, ExprNode, ShortVarDeclNode},
     Annotation,
 };
 
@@ -99,6 +99,106 @@ pub fn visit_short_var_decl<'a>(
 }
 
 pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &AssignmentNode<'a>) {
-    // possibly merge with part of visit_binding_decl_spec
-    todo!()
+    // TODO: possibly merge with part of visit_binding_decl_spec
+
+    if node.kind != AssignmentKind::Simple && node.lhs.len() != 1 {
+        context.report_error(
+            node.location.clone(),
+            AnalysisError::MultiComplexAssignment {
+                file: context.file(),
+                location: node.location.clone(),
+                num: node.lhs.len(),
+            },
+        );
+
+        return;
+    } else if node.lhs.len() != node.rhs.len() {
+        context.report_error(
+            node.location.clone(),
+            AnalysisError::UnevenAssignment {
+                file: context.file(),
+                location: node.location.clone(),
+                left: node.lhs.len(),
+                right: node.rhs.len(),
+            },
+        );
+
+        return;
+    }
+
+    for (lhs, rhs) in node.lhs.iter().zip(node.rhs.iter()) {
+        // sadly this needs to happen beforehand to make the borrow checker happy,
+        // otherwise we would use &mut context while also holding an immutable ref
+        // to context (symbol)
+        let rhs_backtrace = visit_expr(context, rhs);
+        let file = context.file();
+
+        // TODO: support more kinds of left values, e.g. indexing
+        let symbol = if let ExprNode::Name(name) = lhs {
+            // TODO: support package
+            if let Some(sym) = context.symbol_table.get_symbol_mut(name.id.content()) {
+                sym
+            } else {
+                context.report_error(
+                    name.id.location(),
+                    AnalysisError::UnknownSymbol {
+                        file,
+                        symbol: name.id.clone(),
+                    },
+                );
+
+                return;
+            }
+        } else {
+            let loc = find_expr_location(lhs).unwrap_or_else(|| node.location.clone());
+
+            context.report_error(
+                loc.clone(),
+                AnalysisError::InvalidLeftValue {
+                    file,
+                    location: loc,
+                },
+            );
+
+            return;
+        };
+
+        let current_label = symbol
+            .backtrace()
+            .as_ref()
+            .map(LabelBacktrace::label)
+            .cloned()
+            .unwrap_or(Label::Bottom);
+        let rhs_label = rhs_backtrace
+            .as_ref()
+            .map(LabelBacktrace::label)
+            .cloned()
+            .unwrap_or(Label::Bottom);
+
+        let label = if node.kind == AssignmentKind::Simple {
+            rhs_label
+        } else {
+            current_label.union(&rhs_label)
+        };
+
+        if label == Label::Bottom {
+            symbol.set_bottom();
+        } else {
+            symbol.set_backtrace(
+                LabelBacktrace::new(
+                    LabelBacktraceType::Assignment,
+                    file,
+                    node.location.clone(),
+                    Some(symbol.name().clone()),
+                    label,
+                    // constructor will get rid of subsequent children if
+                    // the ones before are is enough to cover the label
+                    [rhs_backtrace, symbol.backtrace().clone()]
+                        .iter()
+                        .filter_map(Option::as_ref),
+                )
+                .unwrap(), // safe if original backtrace exists
+            );
+        }
+    }
 }

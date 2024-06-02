@@ -50,6 +50,14 @@ impl<'a, 'b> SymbolTable<'a, 'b> {
             })
     }
 
+    pub fn get_symbol_mut<'c>(&'c mut self, symbol_name: &str) -> Option<&'c mut Symbol<'a>> {
+        // FIXME: this does not support globals because cannot get mut ref
+        self.scopes
+            .iter_mut()
+            .rev()
+            .find_map(|context| context.get_mut(symbol_name))
+    }
+
     pub fn get_topmost_scope(self) -> SymbolScope<'a> {
         self.scopes
             .into_iter()
@@ -99,5 +107,13 @@ impl<'a> Symbol<'a> {
 
     pub fn backtrace(&self) -> &Option<LabelBacktrace<'a>> {
         &self.label_backtrace
+    }
+
+    pub fn set_backtrace(&mut self, backtrace: LabelBacktrace<'a>) {
+        self.label_backtrace = Some(backtrace)
+    }
+
+    pub fn set_bottom(&mut self) {
+        self.label_backtrace = None
     }
 }

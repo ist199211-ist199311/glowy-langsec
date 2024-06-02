@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use parser::{ParsingError, Span};
+use parser::{Location, ParsingError, Span};
 
 use crate::labels::{Label, LabelBacktrace};
 
@@ -31,6 +31,21 @@ pub enum AnalysisError<'a> {
         file: usize,
         prev_symbol: Span<'a>,
         new_symbol: Span<'a>,
+    },
+    MultiComplexAssignment {
+        file: usize,
+        location: Location,
+        num: usize,
+    },
+    UnevenAssignment {
+        file: usize,
+        location: Location,
+        left: usize,
+        right: usize,
+    },
+    InvalidLeftValue {
+        file: usize,
+        location: Location,
     },
 
     // IFC errors
