@@ -16,7 +16,7 @@ use crate::{
 
 pub fn visit_if<'a>(context: &mut VisitFileContext<'a, '_>, node: &IfNode<'a>) {
     let pushed = if let Some(backtrace) = visit_expr(context, &node.cond) {
-        context.push_branch_label(
+        context.push_branch_backtrace(
             LabelBacktrace::new(
                 LabelBacktraceKind::Branch,
                 backtrace.file(),
@@ -58,7 +58,7 @@ pub fn visit_if<'a>(context: &mut VisitFileContext<'a, '_>, node: &IfNode<'a>) {
     context.symtab_mut().pop(); // implicit block
 
     if pushed {
-        context.pop_branch_label();
+        context.pop_branch_backtrace();
     }
 }
 

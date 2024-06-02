@@ -63,7 +63,7 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
             }
             context.symtab_mut().pop();
         }
-        StatementNode::Return { exprs, location } => visit_return(context, exprs),
+        StatementNode::Return { exprs, location } => visit_return(context, exprs, location),
         StatementNode::Go(expr) => match expr {
             ExprNode::Call(call) => visit_go(context, call),
             _ => {

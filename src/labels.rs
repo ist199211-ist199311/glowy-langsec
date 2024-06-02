@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::BTreeSet, fmt::Display};
 
 use parser::{Location, Span};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Label<'a> {
     Top,
     // This must never have an empty set (use Bottom instead)
