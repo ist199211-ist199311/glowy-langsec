@@ -31,7 +31,7 @@ pub fn visit_binding_decl_spec<'a>(
     annotation: &Option<Box<Annotation<'a>>>,
 ) {
     for (name, expr) in &node.mapping {
-        let expr_backtrace = visit_expr(context, expr);
+        let mut expr_backtrace = visit_expr(context, expr);
         let mut label = expr_backtrace
             .as_ref()
             .map(LabelBacktrace::label)
@@ -55,6 +55,16 @@ pub fn visit_binding_decl_spec<'a>(
                         name.clone(),
                         annotation_label,
                     ));
+                }
+                "declassify" => {
+                    // overwrite, not union
+                    label = Label::from_parts(&annotation.tags);
+                    backtraces = vec![LabelBacktrace::new_explicit_annotation(
+                        context.file(),
+                        name.clone(),
+                        label.clone(),
+                    )];
+                    expr_backtrace = None;
                 }
                 "sink" => {
                     let sink_label = Label::from_parts(&annotation.tags);
