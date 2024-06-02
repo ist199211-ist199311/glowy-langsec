@@ -40,7 +40,7 @@ pub struct VisitFileContext<'a, 'b> {
     analysis_context: &'b mut AnalysisContext<'a>,
     file_id: usize,
     current_package: &'a str,
-    branch_labels: Vec<LabelBacktrace<'a>>, // stack, for implicit flows
+    branch_backtraces: Vec<LabelBacktrace<'a>>, // stack, for implicit flows
 }
 
 impl<'a, 'b> VisitFileContext<'a, 'b> {
@@ -53,7 +53,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
             analysis_context,
             file_id,
             current_package: package,
-            branch_labels: vec![],
+            branch_backtraces: vec![],
         }
     }
 
@@ -83,7 +83,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
     }
 
     pub fn branch_backtrace(&self) -> Option<&LabelBacktrace<'a>> {
-        self.branch_labels.last()
+        self.branch_backtraces.last()
     }
 
     pub fn push_branch_label(&mut self, backtrace: LabelBacktrace<'a>) {
@@ -94,10 +94,10 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
             backtrace
         };
 
-        self.branch_labels.push(composite);
+        self.branch_backtraces.push(composite);
     }
 
     pub fn pop_branch_label(&mut self) {
-        self.branch_labels.pop();
+        self.branch_backtraces.pop();
     }
 }
