@@ -14,9 +14,13 @@ pub struct SymbolTable<'a> {
 
 impl<'a> SymbolTable<'a> {
     pub fn new() -> Self {
-        SymbolTable {
+        let mut symtab = SymbolTable {
             scopes: vec![SymbolScope::new()],
+        };
+        for identifier in PREDECLARED_IDENTIFIERS {
+            symtab.create_symbol(Symbol::new_predeclared(identifier));
         }
+        symtab
     }
 
     // return and replace symbol if already exists
@@ -77,6 +81,15 @@ impl<'a> Symbol<'a> {
         }
     }
 
+    pub fn new_predeclared(name: &'a str) -> Symbol<'a> {
+        Symbol {
+            package: None,
+            name: Span::new(name, 0, 0), // FIXME: predeclared identifiers don't have a span
+            label_backtrace: None,
+            mutable: false,
+        }
+    }
+
     pub fn package(&self) -> &Option<&'a str> {
         &self.package
     }
@@ -101,3 +114,55 @@ impl<'a> Symbol<'a> {
         self.mutable
     }
 }
+
+// https://go.dev/ref/spec#Predeclared_identifiers
+const PREDECLARED_IDENTIFIERS: &[&str] = &[
+    // Types
+    "any",
+    "bool",
+    "byte",
+    "comparable",
+    "complex64",
+    "complex128",
+    "error",
+    "float32",
+    "float64",
+    "int",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
+    "rune",
+    "string",
+    "uint",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+    "uintptr",
+    // Constants
+    "true",
+    "false",
+    "iota",
+    // Zero value
+    "nil",
+    // Functions
+    "append",
+    "cap",
+    "clear",
+    "close",
+    "complex",
+    "copy",
+    "delete",
+    "imag",
+    "len",
+    "make",
+    "max",
+    "min",
+    "new",
+    "panic",
+    "print",
+    "println",
+    "real",
+    "recover",
+];
