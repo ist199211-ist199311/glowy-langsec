@@ -51,6 +51,12 @@ pub enum AnalysisError<'a> {
         file: usize,
         symbol: Span<'a>,
     },
+    UnevenShortVarDecl {
+        file: usize,
+        location: Location,
+        left: usize,
+        right: usize,
+    },
 
     // IFC errors
     InsecureFlow {
@@ -84,7 +90,7 @@ impl InsecureFlowKind {
     pub fn operand(&self) -> &'static str {
         match self {
             Self::Assignment => "the expression being assigned",
-            Self::Call => "one argument",
+            Self::Call => "argument",
         }
     }
 }

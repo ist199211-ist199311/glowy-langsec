@@ -112,8 +112,36 @@ pub fn visit_short_var_decl<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &ShortVarDeclNode<'a>,
 ) {
-    // possibly merge with visit_binding_decl_spec
-    todo!()
+    // treated here as syntax sugar for a normal var decl, for simplicity
+
+    if node.ids.len() != node.exprs.len() {
+        context.report_error(
+            node.location.clone(),
+            AnalysisError::UnevenShortVarDecl {
+                file: context.file(),
+                location: node.location.clone(),
+                left: node.ids.len(),
+                right: node.exprs.len(),
+            },
+        );
+
+        return;
+    }
+
+    visit_binding_decl_spec(
+        context,
+        &BindingDeclSpecNode {
+            mapping: node
+                .ids
+                .iter()
+                .cloned()
+                .zip(node.exprs.iter().cloned())
+                .collect(),
+            r#type: None,
+        },
+        true,
+        &node.annotation,
+    );
 }
 
 pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &AssignmentNode<'a>) {

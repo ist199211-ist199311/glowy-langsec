@@ -161,7 +161,7 @@ fn get_diagnostic_for_error<'a>(
             .with_code("W004")
             .with_message(s!("mismatching number of expressions in assignment"))
             .with_labels(vec![Label::primary(file, location).with_message(format!(
-                "cannot assign {right} expression(s) to assign to {left} left-value(s)",
+                "cannot assign {right} expression(s) to {left} left-value(s)",
             ))])
             .with_notes(vec![s!(
                 "note: this (invalid Go) assignment will be ignored"
@@ -183,6 +183,22 @@ fn get_diagnostic_for_error<'a>(
                 ),
             )])
             .with_notes(vec![s!("note: this assignment will be ignored")]),
+        AnalysisError::UnevenShortVarDecl {
+            file,
+            location,
+            left,
+            right,
+        } => Diagnostic::warning()
+            .with_code("W007")
+            .with_message(s!(
+                "mismatching number of identifiers and expressions in short variable declaration"
+            ))
+            .with_labels(vec![Label::primary(file, location).with_message(format!(
+                "cannot assign {right} expression(s) to {left} identifiers",
+            ))])
+            .with_notes(vec![s!(
+                "note: this (invalid Go) declaration will be ignored"
+            )]),
     }
 }
 
