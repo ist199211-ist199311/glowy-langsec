@@ -37,7 +37,14 @@ impl<'a> Label<'a> {
             (_, Self::Top) => self.clone(),
             (Self::Parts(_), Self::Bottom) => Self::Bottom,
             (Self::Bottom, Self::Parts(_)) => Self::Bottom,
-            (Self::Parts(lparts), Self::Parts(rparts)) => Self::Parts(lparts & rparts),
+            (Self::Parts(lparts), Self::Parts(rparts)) => {
+                let new_parts = lparts & rparts;
+                if new_parts.is_empty() {
+                    Self::Bottom
+                } else {
+                    Self::Parts(new_parts)
+                }
+            }
             (Self::Bottom, Self::Bottom) => Self::Bottom,
         }
     }
@@ -343,6 +350,11 @@ mod tests {
             Label::from_parts(&["lbl1", "lbl3"]),
             Label::from_parts(&["lbl2", "lbl3"]),
             Label::from_parts(&["lbl3"])
+        );
+        intersect!(
+            Label::from_parts(&["lbl1", "lbl2"]),
+            Label::from_parts(&["lbl3", "lbl4"]),
+            Label::Bottom
         );
         intersect!(
             Label::from_parts(&["lbl1", "lbl3"]),
