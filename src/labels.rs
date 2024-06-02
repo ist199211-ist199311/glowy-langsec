@@ -55,7 +55,7 @@ impl<'a> Label<'a> {
             (Self::Top, _) => Self::Top,
             (Self::Parts(_), Self::Bottom) => self.clone(),
             (Self::Parts(lparts), Self::Parts(rparts)) => {
-                let new_parts: BTreeSet<_> = lparts.difference(rparts).cloned().collect();
+                let new_parts = lparts - rparts;
                 if new_parts.is_empty() {
                     Self::Bottom
                 } else {
