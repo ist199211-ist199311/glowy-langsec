@@ -31,8 +31,10 @@ pub fn analyze_files<'a>(
     }
 
     // TODO properly support multiple files
-    for (file_id, node) in &parsed {
-        visit_source_file(&mut context, *file_id, node);
+    while !context.is_finished() {
+        for (file_id, node) in &parsed {
+            visit_source_file(&mut context, *file_id, node);
+        }
     }
 
     if context.errors.is_empty() {

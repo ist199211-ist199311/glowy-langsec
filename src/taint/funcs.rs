@@ -35,11 +35,17 @@ pub fn visit_function_decl<'a>(
         )
     }
 
+    let func_name = node.name.content();
+    if !context.should_visit_function(package, func_name) {
+        return;
+    }
+
     context.symtab_mut().push();
 
     // ensure no stale return labels are present
     // TODO: support nested functions
     context.clear_return_backtraces();
+    context.enter_function(context.current_package(), func_name);
 
     let mut param_id = 0;
 
@@ -90,8 +96,12 @@ pub fn visit_function_decl<'a>(
     };
     context.clear_return_backtraces();
 
-    context.set_function_outcome(package, node.name.content(), outcome);
+    if context.set_function_outcome(package, func_name, outcome) {
+        // outcome has changed, propagate to dependencies
+        context.enqueue_function_reverse_dependencies(package, func_name);
+    }
 
+    context.leave_function();
     context.symtab_mut().pop();
 }
 
@@ -146,9 +156,22 @@ pub fn visit_call<'a>(
     }
 
     if let ExprNode::Name(name) = node.func.as_ref() {
-        if let Some(outcome) =
-            context.get_function_outcome(context.current_package(), name.id.content())
-        {
+        let func_package = name
+            .package
+            .as_ref()
+            .map(|span| span.content())
+            .unwrap_or(context.current_package());
+        context.add_function_reverse_dependency(
+            (
+                context.current_package(),
+                // TODO support calling functions from globals
+                context
+                    .current_function()
+                    .expect("function calls in globals are not supported yet"),
+            ),
+            (func_package, name.id.content()),
+        );
+        if let Some(outcome) = context.get_function_outcome(func_package, name.id.content()) {
             // TODO do something with outcome arguments...
             let label = outcome
                 .return_value
@@ -164,6 +187,9 @@ pub fn visit_call<'a>(
                 &outcome.return_value,
             )
             .and_then(|backtrace| backtrace.replace_synthetic_tags(&args_labels));
+        } else if name.package.is_none() {
+            // FIXME: only functions in the same package are enqueued
+            context.enqueue_function(context.current_package(), name.id.content());
         }
     }
 

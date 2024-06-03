@@ -2,6 +2,9 @@ package main
 
 import "fmt"
 
+// glowy::label::{secret}
+const secret = 123;
+
 func main() {
     // glowy::label::{high}
     var x = 7;
@@ -20,7 +23,7 @@ func even(n int) bool {
 }
 
 func odd(n int) bool {
-    if (n == 0) {
+    if (n == 0 && secret > 0) {
         return false;
     }
     return even(n - 1);

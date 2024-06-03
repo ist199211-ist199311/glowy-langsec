@@ -1,4 +1,7 @@
-use std::{collections::HashMap, ops::Range};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+};
 
 use crate::{
     errors::{AnalysisError, ErrorLocation},
@@ -11,8 +14,10 @@ pub struct AnalysisContext<'a> {
     /// Symbols of the entire program, where the topmost scope represents
     /// the global scope.
     symbol_table: SymbolTable<'a>,
+    /// Queue of functions to visit
+    function_queue: HashSet<(&'a str, &'a str)>,
     /// Map of ((package, name), function)
-    functions: HashMap<(&'a str, &'a str), FunctionContext<'a>>,
+    pub functions: HashMap<(&'a str, &'a str), FunctionContext<'a>>,
     /// Map of error location and the respective error.
     /// This is a map to avoid reporting the same error multiple times.
     pub errors: HashMap<ErrorLocation, AnalysisError<'a>>,
@@ -22,18 +27,25 @@ impl<'a> AnalysisContext<'a> {
     pub fn new() -> Self {
         Self {
             symbol_table: SymbolTable::new(),
+            function_queue: HashSet::from([("main", "main")]),
             functions: HashMap::new(),
             errors: HashMap::new(),
         }
     }
+
+    pub fn is_finished(&self) -> bool {
+        self.function_queue.is_empty()
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FunctionContext<'a> {
-    outcome: FunctionOutcome<'a>,
+    outcome: Option<FunctionOutcome<'a>>,
+    /// Functions that depend on this one
+    reverse_dependencies: HashSet<(&'a str, &'a str)>, // (package, function name)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FunctionOutcome<'a> {
     pub arguments: Vec<Option<LabelBacktrace<'a>>>,
     pub return_value: Vec<LabelBacktrace<'a>>,
@@ -44,6 +56,7 @@ pub struct VisitFileContext<'a, 'b> {
     analysis_context: &'b mut AnalysisContext<'a>,
     file_id: usize,
     current_package: &'a str,
+    current_function: Option<&'a str>,
     branch_backtraces: Vec<LabelBacktrace<'a>>, // stack, for implicit flows
     return_backtraces: Vec<LabelBacktrace<'a>>, // for function return labels
 }
@@ -58,6 +71,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
             analysis_context,
             file_id,
             current_package: package,
+            current_function: None,
             branch_backtraces: vec![],
             return_backtraces: vec![],
         }
@@ -66,10 +80,8 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
     pub fn report_error(&mut self, location: Range<usize>, error: AnalysisError<'a>) {
         let error_location = ErrorLocation::new(self.file_id, location);
 
-        self.analysis_context
-            .errors
-            .entry(error_location)
-            .or_insert(error);
+        // TODO this needs to be handled better
+        self.analysis_context.errors.insert(error_location, error);
     }
 
     pub fn file(&self) -> usize {
@@ -78,6 +90,10 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
 
     pub fn current_package(&self) -> &'a str {
         self.current_package
+    }
+
+    pub fn current_function(&self) -> Option<&'a str> {
+        self.current_function
     }
 
     pub fn symtab(&self) -> &SymbolTable<'a> {
@@ -127,7 +143,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         self.analysis_context
             .functions
             .get(&(package, name))
-            .map(|func_context| &func_context.outcome)
+            .and_then(|func_context| func_context.outcome.as_ref())
     }
 
     pub fn set_function_outcome(
@@ -135,10 +151,61 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         package: &'a str,
         name: &'a str,
         outcome: FunctionOutcome<'a>,
+    ) -> bool {
+        let prev_outcome = &mut self
+            .analysis_context
+            .functions
+            .entry((package, name))
+            .or_default()
+            .outcome;
+        let new_outcome = Some(outcome);
+        let changed = *prev_outcome != new_outcome;
+        *prev_outcome = new_outcome;
+        changed
+    }
+
+    pub fn enqueue_function_reverse_dependencies(&mut self, package: &'a str, name: &'a str) {
+        if let Some(func_context) = self.analysis_context.functions.get(&(package, name)) {
+            func_context
+                .reverse_dependencies
+                .iter()
+                .for_each(|dependency| {
+                    self.analysis_context.function_queue.insert(*dependency);
+                });
+        }
+    }
+
+    pub fn enqueue_function(&mut self, package: &'a str, name: &'a str) {
+        self.analysis_context.function_queue.insert((package, name));
+    }
+
+    pub fn add_function_reverse_dependency(
+        &mut self,
+        from: (&'a str, &'a str),
+        to: (&'a str, &'a str),
     ) {
         self.analysis_context
             .functions
-            .entry((package, name))
-            .or_insert(FunctionContext { outcome });
+            .entry(to)
+            .or_default()
+            .reverse_dependencies
+            .insert(from);
+    }
+
+    pub fn should_visit_function(&self, package: &'a str, name: &'a str) -> bool {
+        self.analysis_context
+            .function_queue
+            .contains(&(package, name))
+    }
+
+    pub fn enter_function(&mut self, package: &'a str, name: &'a str) {
+        self.current_function = Some(name);
+        self.analysis_context
+            .function_queue
+            .remove(&(package, name));
+    }
+
+    pub fn leave_function(&mut self) {
+        self.current_function = None;
     }
 }
