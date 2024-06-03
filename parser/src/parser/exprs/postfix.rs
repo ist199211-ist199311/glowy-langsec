@@ -1,7 +1,7 @@
 use super::{parse_expression, parse_expressions_list_while};
 use crate::{
     ast::{CallNode, ExprNode, IndexingNode},
-    parser::{expect, of_kind, PResult},
+    parser::{expect, of_kind, types::parse_channel_type, PResult},
     token::{Token, TokenKind},
     TokenStream,
 };
@@ -11,8 +11,22 @@ pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a
 
     // TODO: support trailing comma
 
-    // TODO: support type argument at the beginning
+    // TODO: support type arguments besides (non-receive) channel types
     // ^ (in general, indistinguishable from expression? e.g. "int" vs "abc")
+
+    // cannot support receive channel types: f(<-some_channel) or f(<-chan int) ??
+    let type_arg = if let Some(Ok(of_kind!(TokenKind::Chan))) = s.peek() {
+        let channel_type = parse_channel_type(s)?;
+
+        // if this was not the only argument
+        if let Some(Ok(of_kind!(TokenKind::Comma))) = s.peek() {
+            s.next(); // continue to actual arguments
+        }
+
+        Some(channel_type)
+    } else {
+        None
+    };
 
     let args = parse_expressions_list_while(s, |token| {
         !matches!(token.kind, TokenKind::Ellipsis | TokenKind::ParenR)
@@ -31,6 +45,7 @@ pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a
 
     Ok(CallNode {
         func: Box::new(func),
+        type_arg,
         args,
         variadic,
         location: s.location_since(&paren),
@@ -77,7 +92,9 @@ pub fn parse_postfix_if_exists<'a>(
 mod tests {
     use super::*;
     use crate::{
-        ast::{BinaryOpKind, LiteralNode, OperandNameNode, UnaryOpKind},
+        ast::{
+            BinaryOpKind, ChannelDirection, LiteralNode, OperandNameNode, TypeNode, UnaryOpKind,
+        },
         lexer::Lexer,
         parser::exprs::parse_expression,
         Span,
@@ -103,6 +120,7 @@ mod tests {
                         right: Box::new(ExprNode::Literal(LiteralNode::Int(14))),
                         location: 1..13,
                     }),
+                    type_arg: None,
                     args: vec![
                         ExprNode::BinaryOp {
                             kind: BinaryOpKind::Sum,
@@ -125,6 +143,7 @@ mod tests {
                     location: 14..33,
                     annotation: None,
                 })),
+                type_arg: None,
                 args: vec![],
                 variadic: false,
                 location: 33..35,
@@ -159,12 +178,87 @@ mod tests {
                     }),
                     location: 14..22,
                 })),
+                type_arg: None,
                 args: vec![],
                 variadic: false,
                 location: 22..24,
                 annotation: None
             }),
             parse("(abc.def + 14)[k + 2,]()").unwrap()
+        )
+    }
+
+    #[test]
+    fn call_with_type_arg() {
+        assert_eq!(
+            ExprNode::Call(CallNode {
+                func: Box::new(ExprNode::Name(OperandNameNode {
+                    package: Some(Span::new("p", 0, 1)),
+                    id: Span::new("f", 2, 1)
+                })),
+                type_arg: Some(TypeNode::Channel {
+                    r#type: Box::new(TypeNode::Name {
+                        package: None,
+                        id: Span::new("int", 9, 1),
+                        args: vec![]
+                    }),
+                    direction: None,
+                }),
+                args: vec![
+                    ExprNode::Literal(LiteralNode::Rune('\u{0007}')),
+                    ExprNode::Call(CallNode {
+                        func: Box::new(ExprNode::Name(OperandNameNode {
+                            package: None,
+                            id: Span::new("g", 20, 1)
+                        })),
+                        type_arg: Some(TypeNode::Channel {
+                            r#type: Box::new(TypeNode::Name {
+                                package: None,
+                                id: Span::new("u32", 29, 1),
+                                args: vec![]
+                            }),
+                            direction: Some(ChannelDirection::Send),
+                        }),
+                        args: vec![ExprNode::Call(CallNode {
+                            func: Box::new(ExprNode::Name(OperandNameNode {
+                                package: None,
+                                id: Span::new("h", 34, 1)
+                            })),
+                            type_arg: Some(TypeNode::Channel {
+                                r#type: Box::new(TypeNode::Name {
+                                    package: Some(Span::new("pkg", 43, 1)),
+                                    id: Span::new("T", 47, 1),
+                                    args: vec![
+                                        TypeNode::Name {
+                                            package: None,
+                                            id: Span::new("E", 49, 1),
+                                            args: vec![]
+                                        },
+                                        TypeNode::Name {
+                                            package: Some(Span::new("x", 52, 1)),
+                                            id: Span::new("F", 54, 1),
+                                            args: vec![]
+                                        }
+                                    ]
+                                }),
+                                direction: Some(ChannelDirection::Send),
+                            }),
+                            args: vec![],
+                            variadic: false,
+                            location: 35..57,
+                            annotation: None,
+                        })],
+                        variadic: false,
+                        location: 21..58,
+                        annotation: None,
+                    })
+                ],
+                variadic: true,
+                location: 3..62,
+                annotation: None,
+            }),
+            // TODO: ... g(<-chan u32), when supported
+            parse("p.f(chan int, '\\a', g(chan<- u32, h(chan<- pkg.T[E, x.F]))...)").unwrap()
         )
     }
 }
