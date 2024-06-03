@@ -4,7 +4,8 @@ use parser::Span;
 
 use crate::labels::LabelBacktrace;
 
-type SymbolScope<'a> = HashMap<&'a str, Symbol<'a>>;
+type SymbolId<'a> = (Option<&'a str>, &'a str); // package is None for builtins
+type SymbolScope<'a> = HashMap<SymbolId<'a>, Symbol<'a>>;
 
 // TODO: review this for multiple file support
 #[derive(Debug, Clone)]
@@ -29,21 +30,30 @@ impl<'a> SymbolTable<'a> {
             .scopes
             .last_mut()
             .expect("symbol table should always have at least one scope");
-        scope.insert(symbol.name.content(), symbol)
+        scope.insert((symbol.package, symbol.name.content()), symbol)
     }
 
-    pub fn get_symbol<'b>(&'b self, symbol_name: &str) -> Option<&'b Symbol<'a>> {
-        self.scopes
-            .iter()
-            .rev()
-            .find_map(|context| context.get(symbol_name))
+    pub fn get_symbol<'b>(
+        &'b self,
+        package: &'a str,
+        symbol_name: &'a str,
+    ) -> Option<&'b Symbol<'a>> {
+        self.scopes.iter().rev().find_map(|context| {
+            context
+                .get(&(Some(package), symbol_name))
+                .or_else(|| context.get(&(None, symbol_name)))
+        })
     }
 
-    pub fn get_symbol_mut<'b>(&'b mut self, symbol_name: &str) -> Option<&'b mut Symbol<'a>> {
+    pub fn get_symbol_mut<'b>(
+        &'b mut self,
+        package: &'a str,
+        symbol_name: &'a str,
+    ) -> Option<&'b mut Symbol<'a>> {
         self.scopes
             .iter_mut()
             .rev()
-            .find_map(|context| context.get_mut(symbol_name))
+            .find_map(|context| context.get_mut(&(Some(package), symbol_name)))
     }
 
     pub fn push(&mut self) {
@@ -88,10 +98,6 @@ impl<'a> Symbol<'a> {
             label_backtrace: None,
             mutable: false,
         }
-    }
-
-    pub fn package(&self) -> &Option<&'a str> {
-        &self.package
     }
 
     pub fn name(&self) -> &Span<'a> {

@@ -81,7 +81,7 @@ pub fn visit_function_decl<'a>(
         .params
         .iter()
         .flat_map(|param| &param.ids)
-        .map(|id| context.symtab().get_symbol(id.content()))
+        .map(|id| context.symtab().get_symbol(package, id.content()))
         .map(|symbol| symbol.and_then(|symbol| symbol.backtrace().clone()))
         .collect::<Vec<_>>();
     let outcome = FunctionOutcome {

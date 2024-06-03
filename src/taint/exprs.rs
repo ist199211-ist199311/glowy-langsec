@@ -3,7 +3,7 @@ use parser::{
     Location,
 };
 
-use super::funcs::visit_call;
+use super::{funcs::visit_call, package_or_current};
 use crate::{
     context::VisitFileContext,
     errors::AnalysisError,
@@ -16,7 +16,8 @@ pub fn visit_expr<'a>(
 ) -> Option<LabelBacktrace<'a>> {
     match node {
         ExprNode::Name(name) => {
-            let symbol = context.symtab().get_symbol(name.id.content());
+            let package = package_or_current!(context, name.package);
+            let symbol = context.symtab().get_symbol(package, name.id.content());
 
             if let Some(symbol) = symbol {
                 symbol.backtrace().as_ref().map(|symbol_backtrace| {

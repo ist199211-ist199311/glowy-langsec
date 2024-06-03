@@ -2,7 +2,7 @@ use std::{collections::HashMap, ops::Range};
 
 use crate::{
     errors::{AnalysisError, ErrorLocation},
-    labels::{Label, LabelBacktrace},
+    labels::LabelBacktrace,
     symbols::SymbolTable,
 };
 

@@ -5,7 +5,10 @@ use parser::{
     Annotation,
 };
 
-use super::exprs::{find_expr_location, visit_expr};
+use super::{
+    exprs::{find_expr_location, visit_expr},
+    package_or_current,
+};
 use crate::{
     context::VisitFileContext,
     errors::{AnalysisError, InsecureFlowKind},
@@ -192,8 +195,11 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
 
         // TODO: support more kinds of left values, e.g. indexing
         let symbol = if let ExprNode::Name(name) = lhs {
-            // TODO: support package
-            if let Some(sym) = context.symtab_mut().get_symbol_mut(name.id.content()) {
+            let package = package_or_current!(context, name.package);
+            if let Some(sym) = context
+                .symtab_mut()
+                .get_symbol_mut(package, name.id.content())
+            {
                 if sym.mutable() {
                     sym
                 } else {

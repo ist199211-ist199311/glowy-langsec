@@ -14,6 +14,20 @@ mod exprs;
 mod funcs;
 mod implicit;
 
+macro_rules! package_or_current {
+    ($context: expr, $package_opt: expr) => {
+        $package_opt
+            .as_ref()
+            .map(|span| span.content())
+            .unwrap_or($context.current_package())
+    };
+}
+// required to allow the `allow()` below
+#[allow(clippy::useless_attribute)]
+// required for usage in this module's children
+#[allow(clippy::needless_pub_self)]
+pub(self) use package_or_current;
+
 pub fn visit_source_file<'a>(
     context: &mut AnalysisContext<'a>,
     file_id: usize,
