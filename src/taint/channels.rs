@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use parser::{
     ast::{ExprNode, SendNode},
     Location,
@@ -9,8 +11,8 @@ use super::{
 };
 use crate::{
     context::VisitFileContext,
-    errors::AnalysisError,
-    labels::{LabelBacktrace, LabelBacktraceKind},
+    errors::{AnalysisError, InsecureFlowKind},
+    labels::{Label, LabelBacktrace, LabelBacktraceKind},
 };
 
 // this cannot be a function because borrow checker :(
@@ -55,8 +57,6 @@ macro_rules! get_channel_symbol {
 }
 
 pub fn visit_send<'a>(context: &mut VisitFileContext<'a, '_>, node: &SendNode<'a>) {
-    // TODO: support (label? +) sink annotations
-
     let expr_backtrace = if let Some(backtrace) = visit_expr(context, &node.expr) {
         backtrace
     } else {
@@ -77,7 +77,25 @@ pub fn visit_send<'a>(context: &mut VisitFileContext<'a, '_>, node: &SendNode<'a
     )
     .unwrap(); // safe since at least expr_backtrace is not Bottom
 
-    symbol.set_backtrace(backtrace);
+    symbol.set_backtrace(backtrace.clone());
+
+    if let Some(annotation) = &node.annotation {
+        if annotation.scope == "sink" {
+            let sink_label = Label::from_parts(&annotation.tags);
+
+            if let None | Some(Ordering::Greater) = backtrace.label().partial_cmp(&sink_label) {
+                context.report_error(
+                    node.location.clone(),
+                    AnalysisError::InsecureFlow {
+                        kind: InsecureFlowKind::Send,
+                        sink_label,
+                        backtrace,
+                    },
+                );
+            }
+        }
+        // TODO: else { error, invalid scope }
+    }
 }
 
 pub fn visit_receive<'a>(
