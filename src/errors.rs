@@ -78,6 +78,7 @@ pub enum AnalysisError<'a> {
 pub enum InsecureFlowKind {
     Assignment,
     Call,
+    Send,
 }
 
 impl InsecureFlowKind {
@@ -85,6 +86,7 @@ impl InsecureFlowKind {
         match self {
             Self::Assignment => 1,
             Self::Call => 2,
+            Self::Send => 3,
         }
     }
 
@@ -92,6 +94,7 @@ impl InsecureFlowKind {
         match self {
             Self::Assignment => "assignment",
             Self::Call => "function call",
+            Self::Send => "send statement",
         }
     }
 
@@ -99,6 +102,7 @@ impl InsecureFlowKind {
         match self {
             Self::Assignment => "the expression being assigned",
             Self::Call => "argument",
+            Self::Send => "the expression being sent",
         }
     }
 }
