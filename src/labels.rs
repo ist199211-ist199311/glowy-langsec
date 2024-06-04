@@ -268,6 +268,27 @@ impl<'a> LabelBacktrace<'a> {
         }
     }
 
+    pub fn from_children<'b>(
+        children: impl Iterator<Item = &'b Option<LabelBacktrace<'a>>>,
+        with_kind: LabelBacktraceKind,
+        file_id: usize,
+        at_location: Location,
+        symbol: Option<Span<'a>>,
+    ) -> Option<LabelBacktrace<'a>>
+    where
+        'a: 'b,
+    {
+        let backtraces: Vec<&LabelBacktrace<'a>> =
+            children.filter(|x| Option::is_some(x)).flatten().collect();
+
+        let label = backtraces
+            .iter()
+            .map(|bt| bt.label())
+            .fold(Label::Bottom, |acc, label| acc.union(label));
+
+        Self::new(with_kind, file_id, at_location, symbol, label, backtraces)
+    }
+
     pub fn with_child(&self, child: &LabelBacktrace<'a>) -> LabelBacktrace<'a> {
         Self::new(
             self.kind,
@@ -353,6 +374,8 @@ pub enum LabelBacktraceKind {
     FunctionArgument,
     FunctionCall,
     Return,
+    Send,
+    Receive,
 }
 
 #[cfg(test)]

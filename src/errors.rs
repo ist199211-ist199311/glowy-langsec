@@ -61,6 +61,10 @@ pub enum AnalysisError<'a> {
         file: usize,
         location: Location,
     },
+    UnsupportedChannelExpr {
+        file: usize,
+        location: Location,
+    },
 
     // IFC errors
     InsecureFlow {

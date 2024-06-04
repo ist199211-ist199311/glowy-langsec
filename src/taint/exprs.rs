@@ -1,9 +1,9 @@
 use parser::{
-    ast::{CallNode, ExprNode, IndexingNode, OperandNameNode},
+    ast::{CallNode, ExprNode, IndexingNode, OperandNameNode, UnaryOpKind},
     Location,
 };
 
-use super::{funcs::visit_call, package_or_current};
+use super::{channels::visit_receive, funcs::visit_call, package_or_current};
 use crate::{
     context::VisitFileContext,
     errors::AnalysisError,
@@ -44,6 +44,11 @@ pub fn visit_expr<'a>(
             }
         }
         ExprNode::Literal(_) => None,
+        ExprNode::UnaryOp {
+            kind: UnaryOpKind::Receive,
+            operand,
+            location,
+        } => visit_receive(context, operand, location),
         ExprNode::UnaryOp { operand, .. } => visit_expr(context, operand.as_ref()),
         ExprNode::BinaryOp {
             left,
@@ -68,7 +73,7 @@ pub fn visit_expr<'a>(
     }
 }
 
-pub fn visit_indexing<'a>(
+fn visit_indexing<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &IndexingNode<'a>,
 ) -> Option<LabelBacktrace<'a>> {
