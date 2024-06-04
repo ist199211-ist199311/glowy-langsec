@@ -307,6 +307,7 @@ pub struct SendNode<'a> {
     pub channel: ExprNode<'a>,
     pub expr: ExprNode<'a>,
     pub location: Location, // for better error messages
+    pub annotation: Option<Box<Annotation<'a>>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

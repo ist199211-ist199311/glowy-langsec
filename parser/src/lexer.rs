@@ -250,7 +250,7 @@ impl<'a> Lexer<'a> {
     fn identifier_or_keyword(&mut self) -> Token<'a> {
         let ident = self.read_while(|ch| is_letter(ch) || is_unicode_digit(ch));
 
-        Token::from_identifier_or_keyword(ident, &mut self.last_annotation)
+        Token::from_identifier_or_keyword(ident)
     }
 
     fn number_literal(&mut self) -> LResult<'a> {
@@ -740,12 +740,7 @@ impl<'a> Iterator for Lexer<'a> {
 
         self.last_token_kind = Some(token.kind.clone());
 
-        // FIXME: find a more sane way to pass annotation to function call
-        // and short var decl without using these punctuation tokens; if
-        // that happens, we can clear last annotation after every token
-        // (right before returning). identifier_or_keyword could also go
-        // back to calling take directly instead of passing a mutable reference
-        if let TokenKind::ColonAssign | TokenKind::ParenL = token.kind {
+        if token.kind.admits_annotation() {
             token.annotation = self.last_annotation.take().map(Box::new);
         } else if token.kind == TokenKind::SemiColon {
             self.last_annotation.take(); // clear

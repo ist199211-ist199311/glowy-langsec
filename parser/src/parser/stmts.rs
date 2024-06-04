@@ -79,10 +79,11 @@ fn parse_expression_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
     }
 
     let node = match s.next().transpose()? {
-        Some(of_kind!(TokenKind::LtMinus)) => StatementNode::Send(SendNode {
+        Some(token @ of_kind!(TokenKind::LtMinus)) => StatementNode::Send(SendNode {
             channel: lhs,
             expr: parse_expression(s)?,
             location: s.location_since(&peeked.unwrap().unwrap()),
+            annotation: token.annotation,
         }),
         Some(of_kind!(TokenKind::PlusPlus)) => StatementNode::Inc {
             operand: lhs,

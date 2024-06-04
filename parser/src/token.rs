@@ -92,6 +92,20 @@ impl TokenKind {
                 | TokenKind::CurlyR
         )
     }
+
+    pub fn admits_annotation(&self) -> bool {
+        matches!(
+            self,
+            // punctuation
+            TokenKind::ColonAssign // short var decl
+            | TokenKind::ParenL // function call
+            | TokenKind::LtMinus // receive
+
+            // keywords
+            | TokenKind::Const // const decl
+            | TokenKind::Var // var decl
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -110,10 +124,7 @@ impl<'a> Token<'a> {
         }
     }
 
-    pub fn from_identifier_or_keyword(
-        span: Span<'a>,
-        annotation: &mut Option<Annotation<'a>>,
-    ) -> Self {
+    pub fn from_identifier_or_keyword(span: Span<'a>) -> Self {
         let kind = match span.content {
             "chan" => TokenKind::Chan,
             "const" => TokenKind::Const,
@@ -128,17 +139,7 @@ impl<'a> Token<'a> {
             _ => TokenKind::Ident,
         };
 
-        let annotation = if kind != TokenKind::Ident {
-            annotation.take().map(Box::new)
-        } else {
-            None
-        };
-
-        Self {
-            kind,
-            span,
-            annotation,
-        }
+        Self::new(kind, span)
     }
 }
 
