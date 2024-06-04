@@ -1,3 +1,4 @@
+use channels::visit_send;
 use explicit::{visit_assignment, visit_binding_decl, visit_short_var_decl};
 use exprs::{find_expr_location, visit_expr};
 use funcs::{visit_function_decl, visit_return};
@@ -9,6 +10,7 @@ use crate::{
     errors::AnalysisError,
 };
 
+mod channels;
 mod explicit;
 mod exprs;
 mod funcs;
@@ -62,7 +64,7 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
         StatementNode::Expr(expr) => {
             visit_expr(context, expr);
         }
-        StatementNode::Send(_) => todo!(),
+        StatementNode::Send(send) => visit_send(context, send),
         StatementNode::Inc { operand, location } | StatementNode::Dec { operand, location } => {
             visit_incdec(context, operand, location)
         }

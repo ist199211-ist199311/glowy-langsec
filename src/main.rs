@@ -208,6 +208,15 @@ fn get_diagnostic_for_error<'a>(
             .with_notes(vec![
                 s!("note: this (invalid Go) statement will be ignored"),
             ]),
+        AnalysisError::UnsupportedChannelExpr { file, location } => Diagnostic::warning()
+            .with_code("W009")
+            .with_message(s!("unsupported channel expression"))
+            .with_labels(vec![Label::primary(file, location).with_message(s!(
+                "expected an operand name, but found another expression"
+            ))])
+            .with_notes(vec![s!(
+                "note: this (unsupported) operation will be ignored"
+            )]),
     }
 }
 
@@ -250,6 +259,14 @@ fn flatten_label_backtrace(backtrace: &LabelBacktrace) -> Vec<Label<usize>> {
             ),
             LabelBacktraceKind::FunctionCall => format!(
                 "function call has return value with label {}",
+                backtrace.label()
+            ),
+            LabelBacktraceKind::Send => format!(
+                "aggregate of information sent into channel has label {}",
+                backtrace.label()
+            ),
+            LabelBacktraceKind::Receive => format!(
+                "information received from channel has label {}",
                 backtrace.label()
             ),
         },
