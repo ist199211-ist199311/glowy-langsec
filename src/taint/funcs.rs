@@ -179,9 +179,7 @@ pub fn visit_return<'a>(
     let branch_backtrace = context.branch_backtrace().cloned();
 
     let return_backtrace = LabelBacktrace::from_children(
-        expr_backtraces
-            .iter()
-            .chain(std::iter::once(&branch_backtrace)),
+        expr_backtraces.iter().flatten().chain(&branch_backtrace),
         LabelBacktraceKind::Return,
         context.file(),
         location.clone(),

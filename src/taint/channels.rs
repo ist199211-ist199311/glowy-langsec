@@ -63,7 +63,10 @@ pub fn visit_send<'a>(context: &mut VisitFileContext<'a, '_>, node: &SendNode<'a
     let symbol = get_channel_symbol!(context, &node.channel, node.location);
 
     let backtrace = LabelBacktrace::from_children(
-        [&Some(expr_backtrace), &branch_backtrace, symbol.backtrace()].into_iter(),
+        [&branch_backtrace, symbol.backtrace()]
+            .into_iter()
+            .flatten()
+            .chain(std::iter::once(&expr_backtrace)),
         LabelBacktraceKind::Send,
         file,
         node.location.clone(),
