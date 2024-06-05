@@ -79,11 +79,11 @@ fn parse_expression_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
     }
 
     let node = match s.next().transpose()? {
-        Some(token @ of_kind!(TokenKind::LtMinus)) => StatementNode::Send(SendNode {
+        Some(of_kind!(TokenKind::LtMinus)) => StatementNode::Send(SendNode {
             channel: lhs,
             expr: parse_expression(s)?,
             location: s.location_since(&peeked.unwrap().unwrap()),
-            annotation: token.annotation,
+            annotation: s.take_last_annotation(),
         }),
         Some(of_kind!(TokenKind::PlusPlus)) => StatementNode::Inc {
             operand: lhs,
@@ -161,15 +161,16 @@ fn parse_identifier_first_stmt<'a>(s: &mut TokenStream<'a>) -> PResult<'a, State
         }
     }
 
-    let token = b.next().unwrap()?; // step over operator that caused break
+    b.next().unwrap()?; // step over operator that caused break
     context.commit()?; // we're sure it's a short var decl so we can go back to the main stream now
+    let annotation = s.take_last_annotation();
 
     if let Some(exprs) = parse_expressions_list_while(s, |t| !terminal_token(&t.kind))? {
         Ok(StatementNode::ShortVarDecl(ShortVarDeclNode {
             ids,
             exprs,
             location: s.location_since(&first),
-            annotation: token.annotation,
+            annotation,
         }))
     } else {
         // reached end-of-file...

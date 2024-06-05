@@ -92,36 +92,17 @@ impl TokenKind {
                 | TokenKind::CurlyR
         )
     }
-
-    pub fn admits_annotation(&self) -> bool {
-        matches!(
-            self,
-            // punctuation
-            TokenKind::ColonAssign // short var decl
-            | TokenKind::ParenL // function call
-            | TokenKind::LtMinus // receive
-
-            // keywords
-            | TokenKind::Const // const decl
-            | TokenKind::Var // var decl
-        )
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
     pub span: Span<'a>,
-    pub annotation: Option<Box<Annotation<'a>>>, // box to prevent bloating size
 }
 
 impl<'a> Token<'a> {
     pub fn new(kind: TokenKind, span: Span<'a>) -> Self {
-        Self {
-            kind,
-            span,
-            annotation: None,
-        }
+        Self { kind, span }
     }
 
     pub fn from_identifier_or_keyword(span: Span<'a>) -> Self {

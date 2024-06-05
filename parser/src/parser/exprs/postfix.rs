@@ -8,6 +8,7 @@ use crate::{
 
 pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a, CallNode<'a>> {
     let paren = expect(s, TokenKind::ParenL, Some("function call"))?;
+    let annotation = s.take_last_annotation();
 
     // TODO: support trailing comma
 
@@ -49,7 +50,7 @@ pub fn parse_call<'a>(s: &mut TokenStream<'a>, func: ExprNode<'a>) -> PResult<'a
         args,
         variadic,
         location: s.location_since(&paren),
-        annotation: paren.annotation,
+        annotation,
     })
 }
 

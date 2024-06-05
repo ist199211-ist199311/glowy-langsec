@@ -148,6 +148,7 @@ fn parse_specs_list<'a>(
 
 fn parse_binding_decl<'a>(s: &mut TokenStream<'a>, kind: BindingKind) -> PResult<'a, DeclNode<'a>> {
     let token = expect(s, kind.keyword(), Some(kind.decl_context()))?;
+    let annotation = s.take_last_annotation();
 
     let specs = match s.peek().cloned().transpose()? {
         Some(of_kind!(TokenKind::Ident)) => vec![parse_spec(s, &kind)?],
@@ -160,7 +161,7 @@ fn parse_binding_decl<'a>(s: &mut TokenStream<'a>, kind: BindingKind) -> PResult
         }
     };
 
-    Ok(kind.build_node(specs, s.location_since(&token), token.annotation))
+    Ok(kind.build_node(specs, s.location_since(&token), annotation))
 }
 
 pub fn parse_const_decl<'a>(s: &mut TokenStream<'a>) -> PResult<'a, DeclNode<'a>> {

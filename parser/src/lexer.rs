@@ -118,6 +118,10 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    pub fn take_last_annotation(&mut self) -> Option<Box<Annotation<'a>>> {
+        self.last_annotation.take().map(Box::new)
+    }
+
     fn peek_char(&mut self) -> Option<char> {
         // cloning Chars<'_> is cheap
         self.src.clone().next()
@@ -637,7 +641,7 @@ impl<'a> Iterator for Lexer<'a> {
 
         self.skip_comments();
 
-        let mut token = match self.peek_char() {
+        let token = match self.peek_char() {
             Some(';') => single_char_token!(TokenKind::SemiColon),
             Some(',') => single_char_token!(TokenKind::Comma),
             Some('(') => single_char_token!(TokenKind::ParenL),
@@ -740,9 +744,7 @@ impl<'a> Iterator for Lexer<'a> {
 
         self.last_token_kind = Some(token.kind.clone());
 
-        if token.kind.admits_annotation() {
-            token.annotation = self.last_annotation.take().map(Box::new);
-        } else if token.kind == TokenKind::SemiColon {
+        if token.kind == TokenKind::SemiColon {
             self.last_annotation.take(); // clear
         }
 
