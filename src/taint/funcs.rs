@@ -17,22 +17,25 @@ pub fn visit_function_decl<'a>(
     context: &mut VisitFileContext<'a, '_>,
     node: &FunctionDeclNode<'a>,
 ) {
-    // declare function symbol
     let package = context.current_package();
-    if let Some(prev_symbol) = context.symtab_mut().create_symbol(Symbol::new_with_package(
-        package,
-        node.name.clone(),
-        None,
-        false,
-    )) {
-        context.report_error(
-            node.name.location(),
-            AnalysisError::Redeclaration {
-                file: context.file(),
-                prev_symbol: prev_symbol.name().clone(),
-                new_symbol: node.name.clone(),
-            },
-        )
+
+    // declaration of global symbols is responsibility of the declarations visitor
+    if context.is_in_function() {
+        if let Some(prev_symbol) = context.symtab_mut().create_symbol(Symbol::new_with_package(
+            package,
+            node.name.clone(),
+            None,
+            false,
+        )) {
+            context.report_error(
+                node.name.location(),
+                AnalysisError::Redeclaration {
+                    file: context.file(),
+                    prev_symbol: prev_symbol.name().clone(),
+                    new_symbol: node.name.clone(),
+                },
+            )
+        }
     }
 
     let func_name = node.name.content();

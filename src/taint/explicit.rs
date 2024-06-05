@@ -106,17 +106,28 @@ pub fn visit_binding_decl_spec<'a>(
             backtraces.iter().chain(expr_backtrace.iter()),
         );
 
-        let new_symbol =
-            Symbol::new_with_package(context.current_package(), name.clone(), backtrace, mutable);
-        if let Some(prev_symbol) = context.symtab_mut().create_symbol(new_symbol) {
-            context.report_error(
-                name.location(),
-                AnalysisError::Redeclaration {
-                    file: context.file(),
-                    prev_symbol: prev_symbol.name().clone(),
-                    new_symbol: name.clone(),
-                },
-            )
+        let package = context.current_package();
+        if context.is_in_function() {
+            let new_symbol = Symbol::new_with_package(package, name.clone(), backtrace, mutable);
+            if let Some(prev_symbol) = context.symtab_mut().create_symbol(new_symbol) {
+                context.report_error(
+                    name.location(),
+                    AnalysisError::Redeclaration {
+                        file: context.file(),
+                        prev_symbol: prev_symbol.name().clone(),
+                        new_symbol: name.clone(),
+                    },
+                )
+            }
+        } else {
+            // declaration of global symbols is responsibility of the declarations visitor,
+            // so this is supposedly already declared
+            let symbol = context.symtab_mut().get_symbol_mut(package, name.content());
+            if let Some(symbol) = symbol {
+                if let Some(backtrace) = backtrace {
+                    symbol.set_backtrace(backtrace);
+                }
+            }
         }
     }
 }

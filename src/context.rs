@@ -18,6 +18,8 @@ pub struct AnalysisContext<'a> {
     function_queue: HashSet<(&'a str, &'a str)>,
     /// Map of ((package, name), function)
     pub functions: HashMap<(&'a str, &'a str), FunctionContext<'a>>,
+    /// Whether the analysis is in a stage that errors can be emitted
+    accept_errors: bool,
     /// Map of error location and the respective error.
     /// This is a map to avoid reporting the same error multiple times.
     pub errors: HashMap<ErrorLocation, AnalysisError<'a>>,
@@ -29,12 +31,21 @@ impl<'a> AnalysisContext<'a> {
             symbol_table: SymbolTable::new(),
             function_queue: HashSet::from([("main", "main")]),
             functions: HashMap::new(),
+            accept_errors: true,
             errors: HashMap::new(),
         }
     }
 
     pub fn is_finished(&self) -> bool {
         self.function_queue.is_empty()
+    }
+
+    pub fn enable_errors(&mut self) {
+        self.accept_errors = true
+    }
+
+    pub fn disable_errors(&mut self) {
+        self.accept_errors = false
     }
 }
 
@@ -78,6 +89,9 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
     }
 
     pub fn report_error(&mut self, location: Range<usize>, error: AnalysisError<'a>) {
+        if !self.analysis_context.accept_errors {
+            return;
+        }
         let error_location = ErrorLocation::new(self.file_id, location);
 
         // TODO this needs to be handled better
@@ -207,5 +221,9 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
 
     pub fn leave_function(&mut self) {
         self.current_function = None;
+    }
+
+    pub fn is_in_function(&self) -> bool {
+        self.current_function.is_some()
     }
 }

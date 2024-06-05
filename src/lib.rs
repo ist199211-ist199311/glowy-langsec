@@ -1,8 +1,9 @@
 use errors::AnalysisError;
 
-use crate::{context::AnalysisContext, taint::visit_source_file};
+use crate::context::AnalysisContext;
 
 mod context;
+mod decls;
 pub mod errors;
 pub mod labels;
 mod symbols;
@@ -30,11 +31,25 @@ pub fn analyze_files<'a>(
         return Err(errors);
     }
 
+    // visit all global declarations before evaluating their expressions
+    for (file_id, node) in &parsed {
+        decls::visit_source_file(&mut context, *file_id, node);
+    }
+
+    context.disable_errors();
+
     // TODO properly support multiple files
     while !context.is_finished() {
         for (file_id, node) in &parsed {
-            visit_source_file(&mut context, *file_id, node);
+            taint::visit_source_file(&mut context, *file_id, node);
         }
+    }
+
+    context.enable_errors();
+
+    // revisit all nodes one more time to emit errors
+    for (file_id, node) in &parsed {
+        taint::visit_source_file(&mut context, *file_id, node);
     }
 
     if context.errors.is_empty() {
