@@ -86,13 +86,10 @@ fn visit_statement<'a>(context: &mut VisitFileContext<'a, '_>, node: &StatementN
                 // I hate this default, but there is no other way of dealing with literals...
                 let location = find_expr_location(expr).unwrap_or(0..usize::MAX);
 
-                context.report_error(
-                    location.clone(),
-                    AnalysisError::GoNotCall {
-                        file: context.file(),
-                        location,
-                    },
-                );
+                context.report_error(AnalysisError::GoNotCall {
+                    file: context.file(),
+                    location,
+                });
             }
         },
     }

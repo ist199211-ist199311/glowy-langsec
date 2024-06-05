@@ -1,13 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Range,
-};
+use std::collections::{HashMap, HashSet};
 
-use crate::{
-    errors::{AnalysisError, ErrorLocation},
-    labels::LabelBacktrace,
-    symbols::SymbolTable,
-};
+use crate::{errors::AnalysisError, labels::LabelBacktrace, symbols::SymbolTable};
 
 #[derive(Debug)]
 pub struct AnalysisContext<'a> {
@@ -17,12 +10,11 @@ pub struct AnalysisContext<'a> {
     /// Queue of functions to visit
     function_queue: HashSet<(&'a str, &'a str)>,
     /// Map of ((package, name), function)
-    pub functions: HashMap<(&'a str, &'a str), FunctionContext<'a>>,
+    functions: HashMap<(&'a str, &'a str), FunctionContext<'a>>,
     /// Whether the analysis is in a stage that errors can be emitted
     accept_errors: bool,
-    /// Map of error location and the respective error.
-    /// This is a map to avoid reporting the same error multiple times.
-    pub errors: HashMap<ErrorLocation, AnalysisError<'a>>,
+    /// Errors emitted during analysis
+    pub errors: Vec<AnalysisError<'a>>,
 }
 
 impl<'a> AnalysisContext<'a> {
@@ -32,7 +24,7 @@ impl<'a> AnalysisContext<'a> {
             function_queue: HashSet::from([("main", "main")]),
             functions: HashMap::new(),
             accept_errors: true,
-            errors: HashMap::new(),
+            errors: Vec::new(),
         }
     }
 
@@ -88,14 +80,10 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         }
     }
 
-    pub fn report_error(&mut self, location: Range<usize>, error: AnalysisError<'a>) {
-        if !self.analysis_context.accept_errors {
-            return;
+    pub fn report_error(&mut self, error: AnalysisError<'a>) {
+        if self.analysis_context.accept_errors {
+            self.analysis_context.errors.push(error);
         }
-        let error_location = ErrorLocation::new(self.file_id, location);
-
-        // TODO this needs to be handled better
-        self.analysis_context.errors.insert(error_location, error);
     }
 
     pub fn file(&self) -> usize {
@@ -207,9 +195,12 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
     }
 
     pub fn should_visit_function(&self, package: &'a str, name: &'a str) -> bool {
-        self.analysis_context
-            .function_queue
-            .contains(&(package, name))
+        // when errors are enabled, we should visit everything
+        self.analysis_context.accept_errors
+            || self
+                .analysis_context
+                .function_queue
+                .contains(&(package, name))
     }
 
     pub fn enter_function(&mut self, package: &'a str, name: &'a str) {

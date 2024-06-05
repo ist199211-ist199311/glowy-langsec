@@ -27,14 +27,11 @@ pub fn visit_function_decl<'a>(
             None,
             false,
         )) {
-            context.report_error(
-                node.name.location(),
-                AnalysisError::Redeclaration {
-                    file: context.file(),
-                    prev_symbol: prev_symbol.name().clone(),
-                    new_symbol: node.name.clone(),
-                },
-            )
+            context.report_error(AnalysisError::Redeclaration {
+                file: context.file(),
+                prev_symbol: prev_symbol.name().clone(),
+                new_symbol: node.name.clone(),
+            })
         }
     }
 
@@ -69,14 +66,11 @@ pub fn visit_function_decl<'a>(
                 param_backtrace,
                 false,
             )) {
-                context.report_error(
-                    id.location(),
-                    AnalysisError::Redeclaration {
-                        file: context.file(),
-                        prev_symbol: prev_symbol.name().clone(),
-                        new_symbol: id.clone(),
-                    },
-                )
+                context.report_error(AnalysisError::Redeclaration {
+                    file: context.file(),
+                    prev_symbol: prev_symbol.name().clone(),
+                    new_symbol: id.clone(),
+                })
             }
         }
     }
@@ -142,16 +136,13 @@ pub fn visit_call<'a>(
             let sink_label = Label::from_parts(&annotation.tags);
 
             if let None | Some(Ordering::Greater) = label.partial_cmp(&sink_label) {
-                context.report_error(
-                    node.location.clone(),
-                    AnalysisError::InsecureFlow {
-                        kind: InsecureFlowKind::Call,
-                        sink_label,
-                        backtrace: backtrace
-                            .clone()
-                            .expect("call label should not to be bottom"),
-                    },
-                );
+                context.report_error(AnalysisError::InsecureFlow {
+                    kind: InsecureFlowKind::Call,
+                    sink_label,
+                    backtrace: backtrace
+                        .clone()
+                        .expect("call args label should not be bottom"),
+                });
             }
         } else {
             // TODO: error message

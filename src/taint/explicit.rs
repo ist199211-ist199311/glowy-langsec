@@ -83,14 +83,11 @@ pub fn visit_binding_decl_spec<'a>(
                         )
                         .expect("assignment label should not be bottom");
 
-                        context.report_error(
-                            name.location(),
-                            AnalysisError::InsecureFlow {
-                                kind: InsecureFlowKind::Assignment,
-                                sink_label,
-                                backtrace,
-                            },
-                        );
+                        context.report_error(AnalysisError::InsecureFlow {
+                            kind: InsecureFlowKind::Assignment,
+                            sink_label,
+                            backtrace,
+                        });
                     }
                 }
                 _ => {}
@@ -110,14 +107,11 @@ pub fn visit_binding_decl_spec<'a>(
         if context.is_in_function() {
             let new_symbol = Symbol::new_with_package(package, name.clone(), backtrace, mutable);
             if let Some(prev_symbol) = context.symtab_mut().create_symbol(new_symbol) {
-                context.report_error(
-                    name.location(),
-                    AnalysisError::Redeclaration {
-                        file: context.file(),
-                        prev_symbol: prev_symbol.name().clone(),
-                        new_symbol: name.clone(),
-                    },
-                )
+                context.report_error(AnalysisError::Redeclaration {
+                    file: context.file(),
+                    prev_symbol: prev_symbol.name().clone(),
+                    new_symbol: name.clone(),
+                })
             }
         } else {
             // declaration of global symbols is responsibility of the declarations visitor,
@@ -139,15 +133,12 @@ pub fn visit_short_var_decl<'a>(
     // treated here as syntax sugar for a normal var decl, for simplicity
 
     if node.ids.len() != node.exprs.len() {
-        context.report_error(
-            node.location.clone(),
-            AnalysisError::UnevenShortVarDecl {
-                file: context.file(),
-                location: node.location.clone(),
-                left: node.ids.len(),
-                right: node.exprs.len(),
-            },
-        );
+        context.report_error(AnalysisError::UnevenShortVarDecl {
+            file: context.file(),
+            location: node.location.clone(),
+            left: node.ids.len(),
+            right: node.exprs.len(),
+        });
 
         return;
     }
@@ -172,26 +163,20 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
     // TODO: possibly merge with part of visit_binding_decl_spec
 
     if node.kind != AssignmentKind::Simple && node.lhs.len() != 1 {
-        context.report_error(
-            node.location.clone(),
-            AnalysisError::MultiComplexAssignment {
-                file: context.file(),
-                location: node.location.clone(),
-                num: node.lhs.len(),
-            },
-        );
+        context.report_error(AnalysisError::MultiComplexAssignment {
+            file: context.file(),
+            location: node.location.clone(),
+            num: node.lhs.len(),
+        });
 
         return;
     } else if node.lhs.len() != node.rhs.len() {
-        context.report_error(
-            node.location.clone(),
-            AnalysisError::UnevenAssignment {
-                file: context.file(),
-                location: node.location.clone(),
-                left: node.lhs.len(),
-                right: node.rhs.len(),
-            },
-        );
+        context.report_error(AnalysisError::UnevenAssignment {
+            file: context.file(),
+            location: node.location.clone(),
+            left: node.lhs.len(),
+            right: node.rhs.len(),
+        });
 
         return;
     }
@@ -214,37 +199,28 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
                 if sym.mutable() {
                     sym
                 } else {
-                    context.report_error(
-                        name.id.location(),
-                        AnalysisError::ImmutableLeftValue {
-                            file,
-                            symbol: name.id.clone(),
-                        },
-                    );
+                    context.report_error(AnalysisError::ImmutableLeftValue {
+                        file,
+                        symbol: name.id.clone(),
+                    });
 
                     return;
                 }
             } else {
-                context.report_error(
-                    name.id.location(),
-                    AnalysisError::UnknownSymbol {
-                        file,
-                        symbol: name.id.clone(),
-                    },
-                );
+                context.report_error(AnalysisError::UnknownSymbol {
+                    file,
+                    symbol: name.id.clone(),
+                });
 
                 return;
             }
         } else {
             let loc = find_expr_location(lhs).unwrap_or_else(|| node.location.clone());
 
-            context.report_error(
-                loc.clone(),
-                AnalysisError::InvalidLeftValue {
-                    file,
-                    location: loc,
-                },
-            );
+            context.report_error(AnalysisError::InvalidLeftValue {
+                file,
+                location: loc,
+            });
 
             return;
         };

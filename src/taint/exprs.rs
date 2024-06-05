@@ -32,13 +32,10 @@ pub fn visit_expr<'a>(
                     .unwrap() // safe since we know backtrace exists
                 })
             } else {
-                context.report_error(
-                    name.id.location(),
-                    AnalysisError::UnknownSymbol {
-                        file: context.file(),
-                        symbol: name.id.clone(),
-                    },
-                );
+                context.report_error(AnalysisError::UnknownSymbol {
+                    file: context.file(),
+                    symbol: name.id.clone(),
+                });
 
                 None
             }

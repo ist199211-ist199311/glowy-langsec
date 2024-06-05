@@ -55,6 +55,6 @@ pub fn analyze_files<'a>(
     if context.errors.is_empty() {
         Ok(())
     } else {
-        Err(context.errors.into_values().collect::<Vec<_>>())
+        Err(context.errors)
     }
 }

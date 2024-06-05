@@ -30,26 +30,20 @@ macro_rules! get_channel_symbol {
             if let Some(symbol) = opt {
                 symbol
             } else {
-                $context.report_error(
-                    name.id.location().clone(),
-                    AnalysisError::UnknownSymbol {
-                        file: $context.file(),
-                        symbol: name.id.clone(),
-                    },
-                );
+                $context.report_error(AnalysisError::UnknownSymbol {
+                    file: $context.file(),
+                    symbol: name.id.clone(),
+                });
 
                 return $err_ret;
             }
         } else {
             let loc = find_expr_location($expr).unwrap_or_else(|| $default_location.clone());
 
-            $context.report_error(
-                loc.clone(),
-                AnalysisError::UnsupportedChannelExpr {
-                    file: $context.file(),
-                    location: loc,
-                },
-            );
+            $context.report_error(AnalysisError::UnsupportedChannelExpr {
+                file: $context.file(),
+                location: loc,
+            });
 
             return $err_ret;
         }
@@ -87,14 +81,11 @@ pub fn visit_send<'a>(context: &mut VisitFileContext<'a, '_>, node: &SendNode<'a
             let sink_label = Label::from_parts(&annotation.tags);
 
             if let None | Some(Ordering::Greater) = backtrace.label().partial_cmp(&sink_label) {
-                context.report_error(
-                    node.location.clone(),
-                    AnalysisError::InsecureFlow {
-                        kind: InsecureFlowKind::Send,
-                        sink_label,
-                        backtrace,
-                    },
-                );
+                context.report_error(AnalysisError::InsecureFlow {
+                    kind: InsecureFlowKind::Send,
+                    sink_label,
+                    backtrace,
+                });
             }
         }
         // TODO: else { error, invalid scope }
