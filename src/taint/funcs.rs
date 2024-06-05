@@ -175,25 +175,19 @@ pub fn visit_return<'a>(
     exprs: &[ExprNode<'a>],
     location: &Location,
 ) {
+    let expr_backtraces: Vec<_> = exprs.iter().map(|node| visit_expr(context, node)).collect();
     let branch_backtrace = context.branch_backtrace().cloned();
-    let exprs_backtraces: Vec<_> = exprs
-        .iter()
-        .flat_map(|node| visit_expr(context, node))
-        .chain(branch_backtrace)
-        .collect();
-    let label = exprs_backtraces
-        .iter()
-        .map(|backtrace| backtrace.label())
-        .fold(Label::Bottom, |acc, label| acc.union(label));
 
-    let return_backtrace = LabelBacktrace::new(
+    let return_backtrace = LabelBacktrace::from_children(
+        expr_backtraces
+            .iter()
+            .chain(std::iter::once(&branch_backtrace)),
         LabelBacktraceKind::Return,
         context.file(),
         location.clone(),
         None,
-        label,
-        &exprs_backtraces,
     );
+
     if let Some(backtrace) = return_backtrace {
         context.push_return_backtraces(backtrace);
     }
