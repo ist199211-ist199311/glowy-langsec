@@ -636,6 +636,11 @@ impl<'a> Iterator for Lexer<'a> {
 
         if let Some(queued) = self.queue.pop_front() {
             self.last_token_kind = Some(queued.kind.clone());
+
+            if queued.kind == TokenKind::SemiColon {
+                self.last_annotation.take(); // clear
+            }
+
             return Some(Ok(queued));
         }
 
