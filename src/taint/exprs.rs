@@ -1,6 +1,6 @@
 use parser::{
     ast::{CallNode, ExprNode, IndexingNode, OperandNameNode, UnaryOpKind},
-    Location,
+    Location, Span,
 };
 
 use super::{channels::visit_receive, funcs::visit_call, package_or_current};
@@ -115,4 +115,21 @@ pub fn find_expr_location(node: &ExprNode<'_>) -> Option<Location> {
     };
 
     Some(loc)
+}
+
+pub fn find_symbols_in_expr<'a>(node: &ExprNode<'a>) -> Vec<(Option<Span<'a>>, Span<'a>)> {
+    match node {
+        ExprNode::Name(OperandNameNode { package, id, .. }) => vec![(package.clone(), id.clone())],
+        ExprNode::Literal(_) => vec![],
+        ExprNode::Call(_) => vec![],
+        ExprNode::Indexing(IndexingNode { expr, .. }) => find_symbols_in_expr(expr),
+        ExprNode::UnaryOp { operand, .. } => find_symbols_in_expr(operand),
+        ExprNode::BinaryOp { left, right, .. } => {
+            let mut lsymbols = find_symbols_in_expr(left);
+            let rsymbols = find_symbols_in_expr(right);
+
+            lsymbols.extend(rsymbols);
+            lsymbols
+        }
+    }
 }

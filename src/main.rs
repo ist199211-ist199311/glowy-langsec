@@ -257,6 +257,11 @@ fn flatten_label_backtrace(backtrace: &LabelBacktrace) -> Vec<Label<usize>> {
                 symbol(backtrace, "argument"),
                 backtrace.label()
             ),
+            LabelBacktraceKind::FunctionArgumentMutation => format!(
+                "{} in function call has had its label mutated to {}",
+                symbol(backtrace, "argument"),
+                backtrace.label()
+            ),
             LabelBacktraceKind::FunctionCall => format!(
                 "function call has return value with label {}",
                 backtrace.label()

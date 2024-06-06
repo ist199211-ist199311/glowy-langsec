@@ -5,7 +5,10 @@ use parser::{
     Location,
 };
 
-use super::{exprs::visit_expr, package_or_current, visit_statement};
+use super::{
+    exprs::{find_symbols_in_expr, visit_expr},
+    package_or_current, visit_statement,
+};
 use crate::{
     context::{FunctionOutcome, VisitFileContext},
     errors::{AnalysisError, InsecureFlowKind},
@@ -169,13 +172,12 @@ pub fn visit_call<'a>(
             }
         }
         if let Some(outcome) = context.get_function_outcome(func_package, name.id.content()) {
-            // TODO do something with outcome arguments...
             let label = outcome
                 .return_value
                 .iter()
                 .map(|backtrace| backtrace.label())
                 .fold(Label::Bottom, |acc, label| acc.union(label));
-            return LabelBacktrace::new(
+            let return_backtrace = LabelBacktrace::new(
                 LabelBacktraceKind::FunctionCall,
                 context.file(),
                 node.location.clone(),
@@ -184,6 +186,53 @@ pub fn visit_call<'a>(
                 &outcome.return_value,
             )
             .and_then(|backtrace| backtrace.replace_synthetic_tags(&args_labels));
+
+            // If label of arguments has changed, propagate that to the respective symbols
+            for (new_arg_backtrace, arg_node) in
+                outcome.arguments.clone().into_iter().zip(&node.args)
+            {
+                let new_arg_backtrace =
+                    new_arg_backtrace.and_then(|bt| bt.replace_synthetic_tags(&args_labels));
+                if let Some(new_arg_backtrace) = new_arg_backtrace {
+                    for (package, name_span) in find_symbols_in_expr(arg_node) {
+                        let file = context.file();
+                        let package = package_or_current!(context, package);
+                        let name = name_span.content();
+
+                        let mut changed = false;
+                        if let Some(symbol) = context.symtab_mut().get_symbol_mut(package, name) {
+                            changed = matches!(
+                                symbol
+                                    .backtrace()
+                                    .as_ref()
+                                    .map(|bt| bt.label())
+                                    .unwrap_or(&Label::Bottom)
+                                    .partial_cmp(new_arg_backtrace.label()),
+                                Some(std::cmp::Ordering::Less) | None
+                            );
+                            if changed {
+                                let new_backtrace = LabelBacktrace::from_children(
+                                    symbol
+                                        .backtrace()
+                                        .iter()
+                                        .chain(std::iter::once(&new_arg_backtrace)),
+                                    LabelBacktraceKind::FunctionArgumentMutation,
+                                    file,
+                                    name_span.location(),
+                                    Some(name_span),
+                                );
+                                symbol.set_backtrace(new_backtrace);
+                            }
+                        }
+
+                        if changed && !context.symtab().is_local(package, name) {
+                            context.enqueue_symbol_reverse_dependencies(package, name);
+                        }
+                    }
+                }
+            }
+
+            return return_backtrace;
         } else if !is_local {
             context.enqueue_symbol(func_package, name.id.content());
         }

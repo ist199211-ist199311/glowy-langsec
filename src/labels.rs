@@ -395,6 +395,7 @@ pub enum LabelBacktraceKind {
     Expression,
     Branch,
     FunctionArgument,
+    FunctionArgumentMutation,
     FunctionCall,
     Return,
     Send,
