@@ -1,4 +1,7 @@
-use parser::ast::{BindingDeclSpecNode, DeclNode, FunctionDeclNode, SourceFileNode};
+use parser::{
+    ast::{BindingDeclSpecNode, DeclNode, FunctionDeclNode, SourceFileNode},
+    Span,
+};
 
 use crate::{
     context::{AnalysisContext, VisitFileContext},
@@ -46,30 +49,28 @@ fn visit_binding_decl_spec<'a>(
     mutable: bool,
 ) {
     for (name, _) in &node.mapping {
-        let new_symbol =
-            Symbol::new_with_package(context.current_package(), name.clone(), None, mutable);
-        if let Some(prev_symbol) = context.declare_global_symbol(new_symbol) {
-            context.report_error(AnalysisError::Redeclaration {
-                file: context.file(),
-                prev_symbol: prev_symbol.name().clone(),
-                new_symbol: name.clone(),
-            })
-        }
+        try_declare_new_symbol(context, name, mutable);
     }
 }
 
 fn visit_function_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &FunctionDeclNode<'a>) {
-    let package = context.current_package();
-    if let Some(prev_symbol) = context.declare_global_symbol(Symbol::new_with_package(
-        package,
-        node.name.clone(),
-        None,
-        false,
-    )) {
+    try_declare_new_symbol(context, &node.name, false);
+}
+
+/// Declare a new symbol in the symbol table or emit a warning if it already
+/// exists
+fn try_declare_new_symbol<'a>(
+    context: &mut VisitFileContext<'a, '_>,
+    name: &Span<'a>,
+    mutable: bool,
+) {
+    let new_symbol =
+        Symbol::new_with_package(context.current_package(), name.clone(), None, mutable);
+    if let Some(prev_symbol) = context.declare_global_symbol(new_symbol) {
         context.report_error(AnalysisError::Redeclaration {
             file: context.file(),
             prev_symbol: prev_symbol.name().clone(),
-            new_symbol: node.name.clone(),
+            new_symbol: name.clone(),
         })
     }
 }
