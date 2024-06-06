@@ -100,13 +100,16 @@ impl<'a> Label<'a> {
                 concrete_parts.insert(part.clone());
             }
 
-            synthetic_parts
-                .iter()
-                .fold(Label::Bottom, |acc, id| {
-                    // id has been checked to be within the slice's length
-                    acc.union(&replacements[*id])
-                })
-                .union(&Label::Parts(concrete_parts))
+            let concrete_label = if concrete_parts.is_empty() {
+                Label::Bottom
+            } else {
+                Label::Parts(concrete_parts)
+            };
+
+            synthetic_parts.iter().fold(concrete_label, |acc, id| {
+                // id has been checked to be within the slice's length
+                acc.union(&replacements[*id])
+            })
         } else {
             self.clone()
         }
