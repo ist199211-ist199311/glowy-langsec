@@ -38,7 +38,6 @@ pub fn analyze_files<'a>(
 
     context.disable_errors();
 
-    // TODO properly support multiple files
     while !context.is_finished() {
         for (file_id, node) in &parsed {
             taint::visit_source_file(&mut context, *file_id, node);

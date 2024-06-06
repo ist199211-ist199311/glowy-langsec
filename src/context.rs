@@ -1,16 +1,24 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{errors::AnalysisError, labels::LabelBacktrace, symbols::SymbolTable};
+use crate::{
+    errors::AnalysisError,
+    labels::LabelBacktrace,
+    symbols::{Symbol, SymbolTable},
+};
+
+type SymbolId<'a> = (&'a str, &'a str);
 
 #[derive(Debug)]
 pub struct AnalysisContext<'a> {
     /// Symbols of the entire program, where the topmost scope represents
     /// the global scope.
     symbol_table: SymbolTable<'a>,
-    /// Queue of functions to visit
-    function_queue: HashSet<(&'a str, &'a str)>,
+    /// Queue of symbols to visit
+    symbol_queue: HashSet<SymbolId<'a>>,
     /// Map of ((package, name), function)
-    functions: HashMap<(&'a str, &'a str), FunctionContext<'a>>,
+    functions: HashMap<SymbolId<'a>, FunctionContext<'a>>,
+    /// Map of which symbols (values) depend on a certain symbol (key)
+    reverse_dependencies: HashMap<SymbolId<'a>, HashSet<SymbolId<'a>>>,
     /// Whether the analysis is in a stage that errors can be emitted
     accept_errors: bool,
     /// Errors emitted during analysis
@@ -21,15 +29,16 @@ impl<'a> AnalysisContext<'a> {
     pub fn new() -> Self {
         Self {
             symbol_table: SymbolTable::new(),
-            function_queue: HashSet::from([("main", "main")]),
+            symbol_queue: HashSet::new(),
             functions: HashMap::new(),
+            reverse_dependencies: HashMap::new(),
             accept_errors: true,
             errors: Vec::new(),
         }
     }
 
     pub fn is_finished(&self) -> bool {
-        self.function_queue.is_empty()
+        self.symbol_queue.is_empty()
     }
 
     pub fn enable_errors(&mut self) {
@@ -44,8 +53,6 @@ impl<'a> AnalysisContext<'a> {
 #[derive(Debug, Default)]
 pub struct FunctionContext<'a> {
     outcome: Option<FunctionOutcome<'a>>,
-    /// Functions that depend on this one
-    reverse_dependencies: HashSet<(&'a str, &'a str)>, // (package, function name)
 }
 
 #[derive(Debug, PartialEq)]
@@ -59,7 +66,7 @@ pub struct VisitFileContext<'a, 'b> {
     analysis_context: &'b mut AnalysisContext<'a>,
     file_id: usize,
     current_package: &'a str,
-    current_function: Option<&'a str>,
+    current_symbol: Option<&'a str>,
     branch_backtraces: Vec<LabelBacktrace<'a>>, // stack, for implicit flows
     return_backtraces: Vec<LabelBacktrace<'a>>, // for function return labels
 }
@@ -74,7 +81,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
             analysis_context,
             file_id,
             current_package: package,
-            current_function: None,
+            current_symbol: None,
             branch_backtraces: vec![],
             return_backtraces: vec![],
         }
@@ -94,8 +101,8 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         self.current_package
     }
 
-    pub fn current_function(&self) -> Option<&'a str> {
-        self.current_function
+    pub fn current_symbol(&self) -> Option<&'a str> {
+        self.current_symbol
     }
 
     pub fn symtab(&self) -> &SymbolTable<'a> {
@@ -166,55 +173,83 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         changed
     }
 
-    pub fn enqueue_function_reverse_dependencies(&mut self, package: &'a str, name: &'a str) {
-        if let Some(func_context) = self.analysis_context.functions.get(&(package, name)) {
-            func_context
-                .reverse_dependencies
+    pub fn enqueue_symbol_reverse_dependencies(&mut self, package: &'a str, name: &'a str) {
+        // Only enqueue symbols that we can visit
+        if let Some(dependencies) = self
+            .analysis_context
+            .reverse_dependencies
+            .get(&(package, name))
+        {
+            dependencies
                 .iter()
+                .filter(|dependency| {
+                    self.analysis_context
+                        .reverse_dependencies
+                        .contains_key(dependency)
+                })
                 .for_each(|dependency| {
-                    self.analysis_context.function_queue.insert(*dependency);
-                });
+                    self.analysis_context.symbol_queue.insert(*dependency);
+                })
         }
     }
 
-    pub fn enqueue_function(&mut self, package: &'a str, name: &'a str) {
-        self.analysis_context.function_queue.insert((package, name));
+    pub fn enqueue_symbol(&mut self, package: &'a str, name: &'a str) {
+        // Only enqueue symbols that are known globals.
+        // This avoids accidentally enqueuing functions/decls that the analyzer will not
+        // visit, preventing infinite loops.
+        if self
+            .analysis_context
+            .reverse_dependencies
+            .contains_key(&(package, name))
+        {
+            self.analysis_context.symbol_queue.insert((package, name));
+        }
     }
 
-    pub fn add_function_reverse_dependency(
+    pub fn add_symbol_reverse_dependency(
         &mut self,
         from: (&'a str, &'a str),
         to: (&'a str, &'a str),
     ) {
-        self.analysis_context
-            .functions
-            .entry(to)
-            .or_default()
-            .reverse_dependencies
-            .insert(from);
+        // Only symbols that already have an entry can have reverse dependencies added
+        // to them. This avoids accidentally enqueuing functions/decls that the
+        // analyzer will not visit, preventing infinite loops.
+        if let Some(dependencies) = self.analysis_context.reverse_dependencies.get_mut(&to) {
+            dependencies.insert(from);
+        }
     }
 
-    pub fn should_visit_function(&self, package: &'a str, name: &'a str) -> bool {
+    pub fn should_visit_global_symbol(&self, package: &'a str, name: &'a str) -> bool {
         // when errors are enabled, we should visit everything
         self.analysis_context.accept_errors
             || self
                 .analysis_context
-                .function_queue
+                .symbol_queue
                 .contains(&(package, name))
     }
 
-    pub fn enter_function(&mut self, package: &'a str, name: &'a str) {
-        self.current_function = Some(name);
-        self.analysis_context
-            .function_queue
-            .remove(&(package, name));
+    pub fn enter_global_symbol(&mut self, package: &'a str, name: &'a str) {
+        self.current_symbol = Some(name);
+        self.analysis_context.symbol_queue.remove(&(package, name));
     }
 
-    pub fn leave_function(&mut self) {
-        self.current_function = None;
+    pub fn leave_global_symbol(&mut self) {
+        self.current_symbol = None;
     }
 
-    pub fn is_in_function(&self) -> bool {
-        self.current_function.is_some()
+    pub fn is_in_global_symbol(&self) -> bool {
+        self.current_symbol.is_some()
+    }
+
+    pub fn declare_global_symbol(&mut self, symbol: Symbol<'a>) -> Option<Symbol<'a>> {
+        if let Some(package) = symbol.package() {
+            self.analysis_context
+                .reverse_dependencies
+                .insert((package, symbol.name().content()), HashSet::new());
+            self.analysis_context
+                .symbol_queue
+                .insert((package, symbol.name().content()));
+        }
+        self.symtab_mut().create_symbol(symbol)
     }
 }

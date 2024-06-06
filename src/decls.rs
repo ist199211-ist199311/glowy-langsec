@@ -48,7 +48,7 @@ fn visit_binding_decl_spec<'a>(
     for (name, _) in &node.mapping {
         let new_symbol =
             Symbol::new_with_package(context.current_package(), name.clone(), None, mutable);
-        if let Some(prev_symbol) = context.symtab_mut().create_symbol(new_symbol) {
+        if let Some(prev_symbol) = context.declare_global_symbol(new_symbol) {
             context.report_error(AnalysisError::Redeclaration {
                 file: context.file(),
                 prev_symbol: prev_symbol.name().clone(),
@@ -60,7 +60,7 @@ fn visit_binding_decl_spec<'a>(
 
 fn visit_function_decl<'a>(context: &mut VisitFileContext<'a, '_>, node: &FunctionDeclNode<'a>) {
     let package = context.current_package();
-    if let Some(prev_symbol) = context.symtab_mut().create_symbol(Symbol::new_with_package(
+    if let Some(prev_symbol) = context.declare_global_symbol(Symbol::new_with_package(
         package,
         node.name.clone(),
         None,

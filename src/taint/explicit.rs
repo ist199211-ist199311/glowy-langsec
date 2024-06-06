@@ -33,7 +33,16 @@ pub fn visit_binding_decl_spec<'a>(
     mutable: bool,
     annotation: &Option<Box<Annotation<'a>>>,
 ) {
+    let package = context.current_package();
     for (name, expr) in &node.mapping {
+        let mut is_global = false;
+        if !context.is_in_global_symbol() {
+            if !context.should_visit_global_symbol(package, name.content()) {
+                continue;
+            }
+            context.enter_global_symbol(package, name.content());
+            is_global = true;
+        }
         let mut expr_backtrace = visit_expr(context, expr);
         let mut label = expr_backtrace
             .as_ref()
@@ -104,7 +113,22 @@ pub fn visit_binding_decl_spec<'a>(
         );
 
         let package = context.current_package();
-        if context.is_in_function() {
+        if is_global {
+            // declaration of global symbols is responsibility of the declarations visitor,
+            // so this is supposedly already declared
+            let symbol = context.symtab_mut().get_symbol_mut(package, name.content());
+            if let Some(symbol) = symbol {
+                let changed = symbol.backtrace() != &backtrace;
+                symbol.set_backtrace(backtrace);
+                if changed {
+                    // label has changed, propagate to dependencies
+                    context.enqueue_symbol_reverse_dependencies(package, name.content());
+                }
+            } else {
+                unreachable!("expected top-level symbol to exist in symbol table, but it does not");
+            }
+            context.leave_global_symbol();
+        } else {
             let new_symbol = Symbol::new_with_package(package, name.clone(), backtrace, mutable);
             if let Some(prev_symbol) = context.symtab_mut().create_symbol(new_symbol) {
                 context.report_error(AnalysisError::Redeclaration {
@@ -112,15 +136,6 @@ pub fn visit_binding_decl_spec<'a>(
                     prev_symbol: prev_symbol.name().clone(),
                     new_symbol: name.clone(),
                 })
-            }
-        } else {
-            // declaration of global symbols is responsibility of the declarations visitor,
-            // so this is supposedly already declared
-            let symbol = context.symtab_mut().get_symbol_mut(package, name.content());
-            if let Some(symbol) = symbol {
-                if let Some(backtrace) = backtrace {
-                    symbol.set_backtrace(backtrace);
-                }
             }
         }
     }
@@ -239,21 +254,18 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
         if label == Label::Bottom {
             symbol.set_bottom();
         } else {
-            symbol.set_backtrace(
-                LabelBacktrace::new(
-                    LabelBacktraceKind::Assignment,
-                    file,
-                    node.location.clone(),
-                    Some(symbol.name().clone()),
-                    label,
-                    // constructor will get rid of subsequent children if
-                    // the ones before are is enough to cover the label
-                    [rhs_backtrace, branch_backtrace, symbol.backtrace().clone()]
-                        .iter()
-                        .filter_map(Option::as_ref),
-                )
-                .unwrap(), // safe if original backtrace exists
-            );
+            symbol.set_backtrace(LabelBacktrace::new(
+                LabelBacktraceKind::Assignment,
+                file,
+                node.location.clone(),
+                Some(symbol.name().clone()),
+                label,
+                // constructor will get rid of subsequent children if
+                // the ones before are is enough to cover the label
+                [rhs_backtrace, branch_backtrace, symbol.backtrace().clone()]
+                    .iter()
+                    .filter_map(Option::as_ref),
+            ));
         }
     }
 }

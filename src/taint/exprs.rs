@@ -17,6 +17,16 @@ pub fn visit_expr<'a>(
     match node {
         ExprNode::Name(name) => {
             let package = package_or_current!(context, name.package);
+            if let Some(current_symbol) = context.current_symbol() {
+                // ensure reverse dependencies are accounted for
+                if !context.symtab().is_local(package, name.id.content()) {
+                    context.add_symbol_reverse_dependency(
+                        (context.current_package(), current_symbol),
+                        (package, name.id.content()),
+                    );
+                }
+            }
+
             let symbol = context.symtab().get_symbol(package, name.id.content());
 
             if let Some(symbol) = symbol {

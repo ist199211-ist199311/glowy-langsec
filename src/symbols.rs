@@ -56,6 +56,14 @@ impl<'a> SymbolTable<'a> {
             .find_map(|context| context.get_mut(&(Some(package), symbol_name)))
     }
 
+    // Whether this symbol is in a scope that is not the topmost scope
+    pub fn is_local(&self, package: &'a str, symbol_name: &'a str) -> bool {
+        self.scopes
+            .iter()
+            .skip(1)
+            .any(|scope| scope.contains_key(&(Some(package), symbol_name)))
+    }
+
     pub fn push(&mut self) {
         self.scopes.push(SymbolScope::new());
     }
@@ -100,6 +108,10 @@ impl<'a> Symbol<'a> {
         }
     }
 
+    pub fn package(&self) -> Option<&'a str> {
+        self.package
+    }
+
     pub fn name(&self) -> &Span<'a> {
         &self.name
     }
@@ -108,8 +120,8 @@ impl<'a> Symbol<'a> {
         &self.label_backtrace
     }
 
-    pub fn set_backtrace(&mut self, backtrace: LabelBacktrace<'a>) {
-        self.label_backtrace = Some(backtrace)
+    pub fn set_backtrace(&mut self, backtrace: Option<LabelBacktrace<'a>>) {
+        self.label_backtrace = backtrace
     }
 
     pub fn set_bottom(&mut self) {

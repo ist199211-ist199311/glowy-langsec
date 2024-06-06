@@ -5,7 +5,7 @@ use parser::{
     Location,
 };
 
-use super::{exprs::visit_expr, visit_statement};
+use super::{exprs::visit_expr, package_or_current, visit_statement};
 use crate::{
     context::{FunctionOutcome, VisitFileContext},
     errors::{AnalysisError, InsecureFlowKind},
@@ -20,7 +20,7 @@ pub fn visit_function_decl<'a>(
     let package = context.current_package();
 
     // declaration of global symbols is responsibility of the declarations visitor
-    if context.is_in_function() {
+    if context.is_in_global_symbol() {
         if let Some(prev_symbol) = context.symtab_mut().create_symbol(Symbol::new_with_package(
             package,
             node.name.clone(),
@@ -36,7 +36,7 @@ pub fn visit_function_decl<'a>(
     }
 
     let func_name = node.name.content();
-    if !context.should_visit_function(package, func_name) {
+    if !context.should_visit_global_symbol(package, func_name) {
         return;
     }
 
@@ -45,7 +45,7 @@ pub fn visit_function_decl<'a>(
     // ensure no stale return labels are present
     // TODO: support nested functions
     context.clear_return_backtraces();
-    context.enter_function(context.current_package(), func_name);
+    context.enter_global_symbol(context.current_package(), func_name);
 
     let mut param_id = 0;
 
@@ -95,10 +95,10 @@ pub fn visit_function_decl<'a>(
 
     if context.set_function_outcome(package, func_name, outcome) {
         // outcome has changed, propagate to dependencies
-        context.enqueue_function_reverse_dependencies(package, func_name);
+        context.enqueue_symbol_reverse_dependencies(package, func_name);
     }
 
-    context.leave_function();
+    context.leave_global_symbol();
     context.symtab_mut().pop();
 }
 
@@ -150,21 +150,15 @@ pub fn visit_call<'a>(
     }
 
     if let ExprNode::Name(name) = node.func.as_ref() {
-        let func_package = name
-            .package
-            .as_ref()
-            .map(|span| span.content())
-            .unwrap_or(context.current_package());
-        context.add_function_reverse_dependency(
-            (
-                context.current_package(),
-                // TODO support calling functions from globals
-                context
-                    .current_function()
-                    .expect("function calls in globals are not supported yet"),
-            ),
-            (func_package, name.id.content()),
-        );
+        let func_package = package_or_current!(context, name.package);
+        if let Some(current_symbol) = context.current_symbol() {
+            if !context.symtab().is_local(func_package, name.id.content()) {
+                context.add_symbol_reverse_dependency(
+                    (context.current_package(), current_symbol),
+                    (func_package, name.id.content()),
+                );
+            }
+        }
         if let Some(outcome) = context.get_function_outcome(func_package, name.id.content()) {
             // TODO do something with outcome arguments...
             let label = outcome
@@ -183,7 +177,7 @@ pub fn visit_call<'a>(
             .and_then(|backtrace| backtrace.replace_synthetic_tags(&args_labels));
         } else if name.package.is_none() {
             // FIXME: only functions in the same package are enqueued
-            context.enqueue_function(context.current_package(), name.id.content());
+            context.enqueue_symbol(context.current_package(), name.id.content());
         }
     }
 

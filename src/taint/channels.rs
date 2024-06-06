@@ -23,6 +23,14 @@ macro_rules! get_channel_symbol {
     ($context:expr, $expr:expr, $default_location:expr, $err_ret:expr) => {
         if let ExprNode::Name(name) = $expr {
             let package = package_or_current!($context, name.package);
+            if !$context.symtab().is_local(package, name.id.content()) {
+                if let Some(current_symbol) = $context.current_symbol() {
+                    $context.add_symbol_reverse_dependency(
+                        ($context.current_package(), current_symbol),
+                        (package, name.id.content()),
+                    );
+                }
+            }
             let opt = $context
                 .symtab_mut()
                 .get_symbol_mut(package, name.id.content());
@@ -74,7 +82,7 @@ pub fn visit_send<'a>(context: &mut VisitFileContext<'a, '_>, node: &SendNode<'a
     )
     .unwrap(); // safe since at least expr_backtrace is not Bottom
 
-    symbol.set_backtrace(backtrace.clone());
+    symbol.set_backtrace(Some(backtrace.clone()));
 
     if let Some(annotation) = &node.annotation {
         if annotation.scope == "sink" {
