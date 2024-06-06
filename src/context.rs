@@ -19,8 +19,8 @@ pub struct AnalysisContext<'a> {
     functions: HashMap<SymbolId<'a>, FunctionMetadata<'a>>,
     /// Map of which symbols (values) depend on a certain symbol (key)
     reverse_dependencies: HashMap<SymbolId<'a>, HashSet<SymbolId<'a>>>,
-    /// Whether the analysis is in a stage that errors can be emitted
-    accept_errors: bool,
+    /// The current stage of the analysis
+    stage: AnalysisStage,
     /// Errors emitted during analysis
     errors: Vec<AnalysisError<'a>>,
 }
@@ -32,7 +32,7 @@ impl<'a> AnalysisContext<'a> {
             symbol_queue: HashSet::new(),
             functions: HashMap::new(),
             reverse_dependencies: HashMap::new(),
-            accept_errors: true,
+            stage: AnalysisStage::ScanDeclarations,
             errors: Vec::new(),
         }
     }
@@ -41,16 +41,28 @@ impl<'a> AnalysisContext<'a> {
         self.symbol_queue.is_empty()
     }
 
-    pub fn enable_errors(&mut self) {
-        self.accept_errors = true
-    }
-
-    pub fn disable_errors(&mut self) {
-        self.accept_errors = false
+    pub fn set_stage(&mut self, stage: AnalysisStage) {
+        self.stage = stage
     }
 
     pub fn into_errors(self) -> Vec<AnalysisError<'a>> {
         self.errors
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnalysisStage {
+    ScanDeclarations,
+    StabilizeLabels,
+    CheckDataFlow,
+}
+
+impl AnalysisStage {
+    fn admits_errors(&self) -> bool {
+        matches!(
+            self,
+            AnalysisStage::ScanDeclarations | AnalysisStage::CheckDataFlow
+        )
     }
 }
 
@@ -99,7 +111,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
     }
 
     pub fn report_error(&mut self, error: AnalysisError<'a>) {
-        if self.analysis_context.accept_errors {
+        if self.analysis_context.stage.admits_errors() {
             self.analysis_context.errors.push(error);
         }
     }
@@ -235,8 +247,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
     }
 
     pub fn should_visit_global_symbol(&self, package: &'a str, name: &'a str) -> bool {
-        // when errors are enabled, we should visit everything
-        self.analysis_context.accept_errors
+        self.analysis_context.stage == AnalysisStage::CheckDataFlow
             || self
                 .analysis_context
                 .symbol_queue

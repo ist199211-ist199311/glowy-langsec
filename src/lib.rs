@@ -1,3 +1,4 @@
+use context::AnalysisStage;
 use errors::AnalysisError;
 
 use crate::context::AnalysisContext;
@@ -36,7 +37,7 @@ pub fn analyze_files<'a>(
         decls::visit_source_file(&mut context, *file_id, node);
     }
 
-    context.disable_errors();
+    context.set_stage(AnalysisStage::StabilizeLabels);
 
     while !context.is_finished() {
         for (file_id, node) in &parsed {
@@ -44,7 +45,7 @@ pub fn analyze_files<'a>(
         }
     }
 
-    context.enable_errors();
+    context.set_stage(AnalysisStage::CheckDataFlow);
 
     // revisit all nodes one more time to emit errors
     for (file_id, node) in &parsed {
