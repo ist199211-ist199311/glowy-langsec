@@ -51,9 +51,10 @@ pub fn analyze_files<'a>(
         taint::visit_source_file(&mut context, *file_id, node);
     }
 
-    if context.errors.is_empty() {
+    let errors = context.into_errors();
+    if errors.is_empty() {
         Ok(())
     } else {
-        Err(context.errors)
+        Err(errors)
     }
 }

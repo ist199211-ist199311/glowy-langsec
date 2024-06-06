@@ -22,7 +22,7 @@ pub struct AnalysisContext<'a> {
     /// Whether the analysis is in a stage that errors can be emitted
     accept_errors: bool,
     /// Errors emitted during analysis
-    pub errors: Vec<AnalysisError<'a>>,
+    errors: Vec<AnalysisError<'a>>,
 }
 
 impl<'a> AnalysisContext<'a> {
@@ -47,6 +47,10 @@ impl<'a> AnalysisContext<'a> {
 
     pub fn disable_errors(&mut self) {
         self.accept_errors = false
+    }
+
+    pub fn into_errors(self) -> Vec<AnalysisError<'a>> {
+        self.errors
     }
 }
 
