@@ -15,8 +15,8 @@ pub struct AnalysisContext<'a> {
     symbol_table: SymbolTable<'a>,
     /// Queue of symbols to visit
     symbol_queue: HashSet<SymbolId<'a>>,
-    /// Map of ((package, name), function)
-    functions: HashMap<SymbolId<'a>, FunctionContext<'a>>,
+    /// Map of metadata for top-level functions
+    functions: HashMap<SymbolId<'a>, FunctionMetadata<'a>>,
     /// Map of which symbols (values) depend on a certain symbol (key)
     reverse_dependencies: HashMap<SymbolId<'a>, HashSet<SymbolId<'a>>>,
     /// Whether the analysis is in a stage that errors can be emitted
@@ -50,14 +50,21 @@ impl<'a> AnalysisContext<'a> {
     }
 }
 
+/// Extra metadata about top-level functions
 #[derive(Debug, Default)]
-pub struct FunctionContext<'a> {
+struct FunctionMetadata<'a> {
     outcome: Option<FunctionOutcome<'a>>,
 }
 
+/// Represents how the arguments of a function affect the label of its result
+/// value, as well as its arguments when they are mutable (e.g., channels)
 #[derive(Debug, PartialEq)]
 pub struct FunctionOutcome<'a> {
+    /// New labels of arguments (if applicable)
     pub arguments: Vec<Option<LabelBacktrace<'a>>>,
+    /// Label of return values. It's a Vec, since there can be multiple return
+    /// statements. It is responsibility of the caller to generate a label
+    /// backtrace from this.
     pub return_value: Vec<LabelBacktrace<'a>>,
 }
 
@@ -66,7 +73,7 @@ pub struct VisitFileContext<'a, 'b> {
     analysis_context: &'b mut AnalysisContext<'a>,
     file_id: usize,
     current_package: &'a str,
-    current_symbol: Option<&'a str>,
+    current_symbol: Option<&'a str>, // name of the top-level symbol being visited
     branch_backtraces: Vec<LabelBacktrace<'a>>, // stack, for implicit flows
     return_backtraces: Vec<LabelBacktrace<'a>>, // for function return labels
 }
@@ -155,6 +162,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
             .and_then(|func_context| func_context.outcome.as_ref())
     }
 
+    /// Returns whether the outcome has changed
     pub fn set_function_outcome(
         &mut self,
         package: &'a str,
@@ -173,6 +181,8 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         changed
     }
 
+    /// Enqueue all symbols that depend on the given symbol.
+    /// To be used to propagate labels when the label of a symbol changes.
     pub fn enqueue_symbol_reverse_dependencies(&mut self, package: &'a str, name: &'a str) {
         // Only enqueue symbols that we can visit
         if let Some(dependencies) = self
@@ -182,6 +192,7 @@ impl<'a, 'b> VisitFileContext<'a, 'b> {
         {
             dependencies
                 .iter()
+                // Ensure that only symbols that can be visited are enqueued
                 .filter(|dependency| {
                     self.analysis_context
                         .reverse_dependencies
