@@ -151,8 +151,9 @@ pub fn visit_call<'a>(
 
     if let ExprNode::Name(name) = node.func.as_ref() {
         let func_package = package_or_current!(context, name.package);
-        if let Some(current_symbol) = context.current_symbol() {
-            if !context.symtab().is_local(func_package, name.id.content()) {
+        let is_local = context.symtab().is_local(func_package, name.id.content());
+        if !is_local {
+            if let Some(current_symbol) = context.current_symbol() {
                 context.add_symbol_reverse_dependency(
                     (context.current_package(), current_symbol),
                     (func_package, name.id.content()),
@@ -175,9 +176,8 @@ pub fn visit_call<'a>(
                 &outcome.return_value,
             )
             .and_then(|backtrace| backtrace.replace_synthetic_tags(&args_labels));
-        } else if name.package.is_none() {
-            // FIXME: only functions in the same package are enqueued
-            context.enqueue_symbol(context.current_package(), name.id.content());
+        } else if !is_local {
+            context.enqueue_symbol(func_package, name.id.content());
         }
     }
 
