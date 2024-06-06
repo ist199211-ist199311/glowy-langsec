@@ -337,6 +337,29 @@ impl<'a> LabelBacktrace<'a> {
         }
     }
 
+    pub fn remove_tag(self, tag: &LabelTag<'a>) -> Option<Self> {
+        let new_label = self
+            .label
+            .difference(&Label::Parts(BTreeSet::from([tag.clone()])));
+
+        if new_label == Label::Bottom {
+            None
+        } else {
+            Some(Self {
+                kind: self.kind,
+                file_id: self.file_id,
+                location: self.location,
+                symbol: self.symbol,
+                label: new_label,
+                children: self
+                    .children
+                    .into_iter()
+                    .filter_map(|child| child.remove_tag(tag))
+                    .collect(),
+            })
+        }
+    }
+
     pub fn label(&self) -> &Label<'a> {
         &self.label
     }

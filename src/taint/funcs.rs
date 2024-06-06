@@ -9,7 +9,7 @@ use super::{exprs::visit_expr, package_or_current, visit_statement};
 use crate::{
     context::{FunctionOutcome, VisitFileContext},
     errors::{AnalysisError, InsecureFlowKind},
-    labels::{Label, LabelBacktrace, LabelBacktraceKind},
+    labels::{Label, LabelBacktrace, LabelBacktraceKind, LabelTag},
     symbols::Symbol,
 };
 
@@ -85,7 +85,15 @@ pub fn visit_function_decl<'a>(
         .iter()
         .flat_map(|param| &param.ids)
         .map(|id| context.symtab().get_symbol(package, id.content()))
-        .map(|symbol| symbol.and_then(|symbol| symbol.backtrace().clone()))
+        .enumerate()
+        .map(|(i, symbol)| {
+            symbol.and_then(|symbol| {
+                symbol
+                    .backtrace()
+                    .clone()
+                    .and_then(|backtrace| backtrace.remove_tag(&LabelTag::Synthetic(i)))
+            })
+        })
         .collect::<Vec<_>>();
     let outcome = FunctionOutcome {
         arguments: args_backtraces,
