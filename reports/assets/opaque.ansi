@@ -1,0 +1,20 @@
+[0m[1m[38;5;9merror[F002][0m[1m: insecure data flow to sink in function call[0m
+   [0m[34m┌─[0m <stdin>:18:14
+   [0m[34m│[0m
+[0m[34m 6[0m [0m[34m│[0m const secret = 123
+   [0m[34m│[0m       [0m[34m------[0m [0m[34msymbol `secret` has been explicitly annotated with label {sensitive}[0m
+   [0m[34m·[0m
+[0m[34m 9[0m [0m[34m│[0m   if (seed + secret) % 10 == 0 {
+   [0m[34m│[0m      [0m[34m-------------------------[0m
+   [0m[34m│[0m      [0m[34m│[0m[0m[34m│[0m      [0m[34m│[0m
+   [0m[34m│[0m      [0m[34m│[0m[0m[34m│[0m      [0m[34msymbol `secret` has label {sensitive}[0m
+   [0m[34m│[0m      [0m[34m│[0m[0m[34mexpression has label {sensitive}[0m
+   [0m[34m│[0m      [0m[34mexecution branch has label {sensitive}[0m
+[0m[34m10[0m [0m[34m│[0m     return 5
+   [0m[34m│[0m     [0m[34m--------[0m [0m[34mfunction returns with label {sensitive}[0m
+   [0m[34m·[0m
+[0m[34m18[0m [0m[34m│[0m   fmt.Println[0m[31m(4 * opaque(2))[0m
+   [0m[34m│[0m              [0m[31m^^^^^^^^^^^^^^^[0m
+   [0m[34m│[0m              [0m[31m│[0m          [0m[34m│[0m
+   [0m[34m│[0m              [0m[31m│[0m          [0m[34mfunction call has return value with label {sensitive}[0m
+   [0m[34m│[0m              [0m[31msink has label {}, but argument has label {sensitive}[0m
