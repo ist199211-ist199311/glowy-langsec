@@ -111,7 +111,7 @@ impl<'a> Lexer<'a> {
             last_token_kind: None,
             queue: VecDeque::new(),
 
-            annotation_regex: Regex::new(r#"glowy::(?P<scope>\w+)::\{(?P<tags>[^}]*)\}"#).unwrap(),
+            annotation_regex: Regex::new(r"glowy::(?P<scope>\w+)::\{(?P<tags>[^}]*)\}").unwrap(),
             last_annotation: None,
 
             enable_implicit_semicolon: true,
