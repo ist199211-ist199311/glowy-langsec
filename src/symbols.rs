@@ -56,6 +56,13 @@ impl<'a> SymbolTable<'a> {
             .find_map(|context| context.get_mut(&(Some(package), symbol_name)))
     }
 
+    pub fn is_current_scope(&self, package: &'a str, symbol_name: &'a str) -> bool {
+        self.scopes
+            .last()
+            .iter()
+            .any(|scope| scope.contains_key(&(Some(package), symbol_name)))
+    }
+
     // Whether this symbol is in a scope that is not the topmost scope
     pub fn is_local(&self, package: &'a str, symbol_name: &'a str) -> bool {
         self.scopes

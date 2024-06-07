@@ -205,14 +205,17 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
         let file = context.file();
 
         // TODO: support more kinds of left values, e.g. indexing
-        let symbol = if let ExprNode::Name(name) = lhs {
+        let (symbol, is_current_scope) = if let ExprNode::Name(name) = lhs {
             let package = package_or_current!(context, name.package);
+            let is_current_scope = context
+                .symtab()
+                .is_current_scope(package, name.id.content());
             if let Some(sym) = context
                 .symtab_mut()
                 .get_symbol_mut(package, name.id.content())
             {
                 if sym.mutable() {
-                    sym
+                    (sym, is_current_scope)
                 } else {
                     context.report_error(AnalysisError::ImmutableLeftValue {
                         file,
@@ -244,7 +247,10 @@ pub fn visit_assignment<'a>(context: &mut VisitFileContext<'a, '_>, node: &Assig
         let current_label = Label::from(symbol.backtrace());
         let rhs_label = Label::from(&rhs_backtrace);
 
-        let label = if node.kind == AssignmentKind::Simple {
+        // if symbol being assigned to is not in the current scope, we cannot be certain
+        // its label is not being mutated in a parallel branch, so we union it with
+        // the current label
+        let label = if node.kind == AssignmentKind::Simple && is_current_scope {
             rhs_label
         } else {
             current_label.union(&rhs_label)

@@ -237,7 +237,7 @@ fn flatten_label_backtrace(backtrace: &LabelBacktrace) -> Vec<Label<usize>> {
                 backtrace.label()
             ),
             LabelBacktraceKind::Assignment => format!(
-                "{} has been assigned a value that has label {}",
+                "{} has been assigned a value, resulting in label {}",
                 symbol(backtrace, "symbol"),
                 backtrace.label()
             ),
